@@ -1,0 +1,22 @@
+# Secrets — never commit
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+.venv/
+build/
+dist/
+
+# Per-run evidence is generated; committed example runs live under evidence/ explicitly.
+# Ignore ad-hoc run dirs but keep committed examples (added with `git add -f`).
+evidence/*/
+!evidence/.gitkeep
+
+# Playwright
+.playwright/
+
+# Operating-rules file — local only, not part of the repo deliverable
+CLAUDE.md

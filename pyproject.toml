@@ -1,0 +1,40 @@
+[project]
+name = "lyrebird"
+version = "0.1.0"
+description = "Computer-use automation: an LLM discovers a UI flow once; a typed, versioned artifact replays it deterministically."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "jinja2>=3.1",
+    "pydantic>=2.7",
+    "python-multipart>=0.0.9",  # FastAPI form parsing
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+# Browser control, LLM client, and image work land in later phases (C2/C3/C6a).
+# Kept out of the base install so C1 stays minimal and fast to set up.
+surface = ["playwright>=1.44"]
+llm = ["anthropic>=0.40"]
+redaction = ["pillow>=10.0"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "httpx>=0.27",  # FastAPI TestClient dependency
+]
+
+[project.scripts]
+lyrebird = "lyrebird.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/lyrebird", "mockapp"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

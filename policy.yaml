@@ -1,0 +1,25 @@
+# Safety policy — loaded into a typed Policy model in C6a. Fail-closed: anything not
+# explicitly allowed is denied. This is the stub shape from docs/01_ARCHITECTURE.md §6;
+# enforcement is wired into both loops in C6b.
+
+allowlist:
+  domains: ["127.0.0.1", "localhost"]
+  url_patterns:
+    - "/login"
+    - "/member"
+    - "/member/*"
+    - "/member/*/subaccount"
+    - "/member/*/subaccount/*"
+  action_types: ["click", "type", "select", "scroll", "navigate", "press"]
+
+risk:
+  risky_text_patterns: ["submit", "confirm", "transfer", "delete", "close account"]
+  risky_roles: ["button"]
+
+redaction:
+  always_sensitive_params: ["password", "ssn", "full_account_number"]
+  identifier_params: ["member_id"]
+  scrub_patterns:
+    - '\b\d{3}-\d{2}-\d{4}\b'   # SSN
+    - '\b\d{9,}\b'              # long account-number-like runs
+  screenshot_mask: "sensitive_inputs"
