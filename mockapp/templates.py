@@ -122,6 +122,7 @@ WORKSPACE = Template(
         <tr><td class="col">Checking</td><td class="col">$0.00</td></tr>
         <tr><td class="col">Savings</td><td class="col">${{ savings }}</td></tr>
       </table>
+      <button type="button" onclick="location.reload()">Refresh balance</button>
     </td></tr></table>""",
     )
 )
