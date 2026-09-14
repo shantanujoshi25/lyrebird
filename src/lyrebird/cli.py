@@ -18,7 +18,11 @@ import sys
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="lyrebird", description="Computer-use automation.")
     sub = parser.add_subparsers(dest="command")
-    sub.add_parser("discover", help="Run the LLM discovery loop (C3).")
+
+    d = sub.add_parser("discover", help="Run the LLM discovery loop (C3). Spends tokens.")
+    d.add_argument("--url", default="http://127.0.0.1:8000", help="base URL of the running mock app")
+    d.add_argument("--headless", action="store_true", help="run the browser headless")
+
     sub.add_parser("replay", help="Deterministically replay a capability (C5).")
     sub.add_parser("operator", help="Operator handoff console (C7).")
     return parser
@@ -29,6 +33,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command is None:
         parser.print_help()
+        return 0
+    if args.command == "discover":
+        from lyrebird.discovery.run import run_readonly_discovery
+
+        run_readonly_discovery(args.url, headed=not args.headless)
         return 0
     print(f"'{args.command}' is not implemented yet — it lands in its construction phase.")
     return 1

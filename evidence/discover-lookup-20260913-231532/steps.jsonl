@@ -1,0 +1,5 @@
+{"step": 0, "tool": "type", "input": {"index": 0, "param": "username"}, "binding": "{{username}}", "url": "http://127.0.0.1:8000/login", "ok": true, "note": "ok"}
+{"step": 1, "tool": "type", "input": {"index": 1, "param": "password"}, "binding": "{{password}}", "url": "http://127.0.0.1:8000/login", "ok": true, "note": "ok"}
+{"step": 2, "tool": "click", "input": {"index": 2}, "binding": null, "url": "http://127.0.0.1:8000/login", "ok": true, "note": "ok"}
+{"step": 3, "tool": "type", "input": {"index": 0, "param": "member_id"}, "binding": "{{member_id}}", "url": "http://127.0.0.1:8000/member", "ok": true, "note": "ok"}
+{"step": 4, "tool": "click", "input": {"index": 1}, "binding": null, "url": "http://127.0.0.1:8000/member", "ok": true, "note": "ok"}

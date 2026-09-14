@@ -1,0 +1,52 @@
+[
+  {
+    "index": 0,
+    "role": "textbox",
+    "name": "teller (unchecked)",
+    "value": "teller",
+    "bbox": [
+      83,
+      81,
+      147,
+      22
+    ],
+    "container_path": [],
+    "nearby_text": [
+      "Username",
+      "Username"
+    ]
+  },
+  {
+    "index": 1,
+    "role": "textbox",
+    "name": "p (unchecked)",
+    "value": "",
+    "bbox": [
+      83,
+      107,
+      147,
+      22
+    ],
+    "container_path": [],
+    "nearby_text": [
+      "Password",
+      "Password"
+    ]
+  },
+  {
+    "index": 2,
+    "role": "button",
+    "name": "Sign in",
+    "value": "",
+    "bbox": [
+      83,
+      132,
+      57,
+      22
+    ],
+    "container_path": [],
+    "nearby_text": [
+      "Sign in"
+    ]
+  }
+]

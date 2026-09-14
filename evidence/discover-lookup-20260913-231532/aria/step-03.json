@@ -1,0 +1,35 @@
+[
+  {
+    "index": 0,
+    "role": "textbox",
+    "name": "q (unchecked)",
+    "value": "",
+    "bbox": [
+      93,
+      81,
+      147,
+      22
+    ],
+    "container_path": [],
+    "nearby_text": [
+      "Member ID\t\tSearch",
+      "Member ID"
+    ]
+  },
+  {
+    "index": 1,
+    "role": "button",
+    "name": "Search",
+    "value": "",
+    "bbox": [
+      244,
+      81,
+      58,
+      22
+    ],
+    "container_path": [],
+    "nearby_text": [
+      "Member ID\t\tSearch"
+    ]
+  }
+]
