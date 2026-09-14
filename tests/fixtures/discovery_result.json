@@ -1,6 +1,6 @@
 {
   "status": "SUCCESS",
-  "reason": "Successfully signed in and looked up member 100001 (Ada Lovelace). The savings balance is clearly visible in the workspace as $4,210.75.",
+  "reason": "Successfully signed in and looked up member 100001 (Ada Lovelace). The savings balance is clearly displayed in the workspace as $4,210.75.",
   "outputs": {
     "savings_balance": 4210.75
   },

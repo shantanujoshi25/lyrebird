@@ -1,0 +1,341 @@
+{
+  "schema_version": "1.0",
+  "capability_id": "lookup_savings_balance",
+  "name": "Look up member savings balance",
+  "description": "Sign in, search a member by ID, and read the savings balance.",
+  "version": 1,
+  "status": "draft",
+  "target": {
+    "app_id": "mock_cu",
+    "vendor": "lyrebird-mock",
+    "entry_url_pattern": "/member",
+    "tenant": "base"
+  },
+  "inputs": [
+    {
+      "name": "username",
+      "type": "string",
+      "sensitive": false,
+      "example": "teller",
+      "description": null
+    },
+    {
+      "name": "password",
+      "type": "string",
+      "sensitive": true,
+      "example": null,
+      "description": null
+    },
+    {
+      "name": "member_id",
+      "type": "string",
+      "sensitive": false,
+      "example": "100001",
+      "description": null
+    }
+  ],
+  "outputs": [
+    {
+      "name": "savings_balance",
+      "type": "number",
+      "extract": {
+        "semantic_id": "savings_balance_cell",
+        "candidates": [
+          {
+            "strategy": "label_proximity",
+            "args": {
+              "label": "Savings"
+            },
+            "confidence": 0.9
+          }
+        ]
+      },
+      "transform": "currency"
+    }
+  ],
+  "steps": [
+    {
+      "index": 0,
+      "action": "type",
+      "target": {
+        "semantic_id": "u_textbox",
+        "candidates": [
+          {
+            "strategy": "role_name",
+            "args": {
+              "role": "textbox",
+              "name": "u"
+            },
+            "confidence": 0.95
+          },
+          {
+            "strategy": "label_proximity",
+            "args": {
+              "label": "Username",
+              "role": "textbox"
+            },
+            "confidence": 0.7
+          },
+          {
+            "strategy": "relative_anchor",
+            "args": {
+              "anchor": "Username",
+              "relation": "same_row",
+              "role": "textbox"
+            },
+            "confidence": 0.5
+          },
+          {
+            "strategy": "bbox",
+            "args": {
+              "x": "83",
+              "y": "82",
+              "w": "153",
+              "h": "21"
+            },
+            "confidence": 0.2
+          }
+        ]
+      },
+      "value": "{{username}}",
+      "wait_for": null,
+      "precondition": null,
+      "postcondition": null,
+      "on_conditions": [],
+      "risk": "safe",
+      "provenance": "model",
+      "page_fingerprint": null
+    },
+    {
+      "index": 1,
+      "action": "type",
+      "target": {
+        "semantic_id": "p_textbox",
+        "candidates": [
+          {
+            "strategy": "role_name",
+            "args": {
+              "role": "textbox",
+              "name": "p"
+            },
+            "confidence": 0.95
+          },
+          {
+            "strategy": "label_proximity",
+            "args": {
+              "label": "Password",
+              "role": "textbox"
+            },
+            "confidence": 0.7
+          },
+          {
+            "strategy": "relative_anchor",
+            "args": {
+              "anchor": "Password",
+              "relation": "same_row",
+              "role": "textbox"
+            },
+            "confidence": 0.5
+          },
+          {
+            "strategy": "bbox",
+            "args": {
+              "x": "83",
+              "y": "107",
+              "w": "153",
+              "h": "21"
+            },
+            "confidence": 0.2
+          }
+        ]
+      },
+      "value": "{{password}}",
+      "wait_for": null,
+      "precondition": null,
+      "postcondition": null,
+      "on_conditions": [],
+      "risk": "safe",
+      "provenance": "model",
+      "page_fingerprint": null
+    },
+    {
+      "index": 2,
+      "action": "click",
+      "target": {
+        "semantic_id": "sign_in_button",
+        "candidates": [
+          {
+            "strategy": "role_name",
+            "args": {
+              "role": "button",
+              "name": "Sign in"
+            },
+            "confidence": 0.95
+          },
+          {
+            "strategy": "visible_text",
+            "args": {
+              "text": "Sign in"
+            },
+            "confidence": 0.8
+          },
+          {
+            "strategy": "label_proximity",
+            "args": {
+              "label": "Sign in",
+              "role": "button"
+            },
+            "confidence": 0.7
+          },
+          {
+            "strategy": "bbox",
+            "args": {
+              "x": "83",
+              "y": "132",
+              "w": "57",
+              "h": "21"
+            },
+            "confidence": 0.2
+          }
+        ]
+      },
+      "value": null,
+      "wait_for": null,
+      "precondition": null,
+      "postcondition": null,
+      "on_conditions": [],
+      "risk": "safe",
+      "provenance": "model",
+      "page_fingerprint": null
+    },
+    {
+      "index": 3,
+      "action": "type",
+      "target": {
+        "semantic_id": "q_textbox",
+        "candidates": [
+          {
+            "strategy": "role_name",
+            "args": {
+              "role": "textbox",
+              "name": "q"
+            },
+            "confidence": 0.95
+          },
+          {
+            "strategy": "label_proximity",
+            "args": {
+              "label": "Member ID\t\tSearch",
+              "role": "textbox"
+            },
+            "confidence": 0.7
+          },
+          {
+            "strategy": "relative_anchor",
+            "args": {
+              "anchor": "Member ID",
+              "relation": "same_row",
+              "role": "textbox"
+            },
+            "confidence": 0.5
+          },
+          {
+            "strategy": "bbox",
+            "args": {
+              "x": "93",
+              "y": "82",
+              "w": "153",
+              "h": "21"
+            },
+            "confidence": 0.2
+          }
+        ]
+      },
+      "value": "{{member_id}}",
+      "wait_for": null,
+      "precondition": null,
+      "postcondition": null,
+      "on_conditions": [],
+      "risk": "safe",
+      "provenance": "model",
+      "page_fingerprint": null
+    },
+    {
+      "index": 4,
+      "action": "click",
+      "target": {
+        "semantic_id": "search_button",
+        "candidates": [
+          {
+            "strategy": "role_name",
+            "args": {
+              "role": "button",
+              "name": "Search"
+            },
+            "confidence": 0.95
+          },
+          {
+            "strategy": "visible_text",
+            "args": {
+              "text": "Search"
+            },
+            "confidence": 0.8
+          },
+          {
+            "strategy": "label_proximity",
+            "args": {
+              "label": "Member ID\t\tSearch",
+              "role": "button"
+            },
+            "confidence": 0.7
+          },
+          {
+            "strategy": "bbox",
+            "args": {
+              "x": "250",
+              "y": "82",
+              "w": "58",
+              "h": "21"
+            },
+            "confidence": 0.2
+          }
+        ]
+      },
+      "value": null,
+      "wait_for": null,
+      "precondition": null,
+      "postcondition": null,
+      "on_conditions": [],
+      "risk": "safe",
+      "provenance": "model",
+      "page_fingerprint": null
+    }
+  ],
+  "known_conditions": [
+    {
+      "code": "NOT_FOUND",
+      "klass": "business_outcome",
+      "detector": {
+        "by": "text",
+        "match": "No such member"
+      },
+      "on_detect": "return_outcome",
+      "max_retries": 0
+    }
+  ],
+  "success_checkpoint": {
+    "by": "text",
+    "match": "Savings"
+  },
+  "risk_summary": "Read-only; no risky steps.",
+  "provenance": {
+    "discovery_run_id": "discover-lookup-20260914-070324",
+    "model": "claude-sonnet-4-6",
+    "created_at": "2026-09-14T00:00:00Z",
+    "viewport": {
+      "width": 1280,
+      "height": 900,
+      "device_scale_factor": 1.0
+    }
+  }
+}

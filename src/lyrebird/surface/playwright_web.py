@@ -125,7 +125,9 @@ class PlaywrightWebSurface:
             for item in raw:
                 gi = len(elements)
                 name = item["name"]
-                if item.get("checked") is not None:
+                # checked-state suffix only makes sense for toggles; a text input also has a
+                # (false) .checked property in JS, so gate on the role, not on presence.
+                if item["role"] in ("checkbox", "radio") and item.get("checked") is not None:
                     name = f"{name} ({'checked' if item['checked'] else 'unchecked'})".strip()
                 elements.append(
                     Element(

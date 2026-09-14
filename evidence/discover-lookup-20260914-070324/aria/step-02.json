@@ -2,13 +2,13 @@
   {
     "index": 0,
     "role": "textbox",
-    "name": "u (unchecked)",
-    "value": "",
+    "name": "teller",
+    "value": "teller",
     "bbox": [
       83,
-      81,
-      147,
-      22
+      82,
+      153,
+      21
     ],
     "container_path": [],
     "nearby_text": [
@@ -19,13 +19,13 @@
   {
     "index": 1,
     "role": "textbox",
-    "name": "p (unchecked)",
-    "value": "",
+    "name": "[REDACTED]",
+    "value": "[REDACTED]",
     "bbox": [
       83,
       107,
-      147,
-      22
+      153,
+      21
     ],
     "container_path": [],
     "nearby_text": [
@@ -42,7 +42,7 @@
       83,
       132,
       57,
-      22
+      21
     ],
     "container_path": [],
     "nearby_text": [

@@ -6,9 +6,9 @@
     "value": null,
     "bbox": [
       11,
-      348,
+      349,
       116,
-      19
+      18
     ],
     "container_path": [],
     "nearby_text": [
@@ -24,7 +24,7 @@
       25,
       198,
       113,
-      22
+      21
     ],
     "container_path": [
       "frame:http://127.0.0.1:8000/workspace/member/100001"
