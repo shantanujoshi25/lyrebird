@@ -43,11 +43,13 @@ class ReplayContext:
 
 
 class ReplayEngine:
-    def __init__(self, cap: Capability, surface: Surface, policy: Policy, *, evidence_dir: str = "") -> None:
+    def __init__(self, cap: Capability, surface: Surface, policy: Policy, *, evidence_dir: str = "",
+                 controller: "object | None" = None) -> None:
         self.cap = cap
         self.surface = surface
         self.policy = policy
         self.evidence_dir = evidence_dir
+        self.controller = controller  # optional SessionController: makes escalation a REAL handoff
         self._recorded_vp = cap.provenance.viewport
 
     def run(self, ctx: ReplayContext) -> ReplayResult:
@@ -57,6 +59,7 @@ class ReplayEngine:
             # 1. risky-step gate (R4): block unless approved + confirm_risky, else escalate.
             if classify_risk(self.policy, step) is Risk.RISKY:
                 if not (self.cap.status == "approved" and ctx.confirm_risky):
+                    self._escalate(step.index, "risky step requires human authorization")
                     return self._result("ESCALATED", outcome_code=None, failed_step=step.index,
                                         expected="approved artifact + confirm_risky", observed=f"status={self.cap.status}",
                                         fallback_depths=fallback_depths)
@@ -204,6 +207,23 @@ class ReplayEngine:
         if param and param.sensitive:
             return os.environ.get(f"LYREBIRD_PARAM_{name.upper()}", "")
         return ctx.params.get(name, "")
+
+    def _escalate(self, step: int, reason: str) -> None:
+        """If a SessionController is attached, turn this stop into a REAL handoff: write the
+        intervention request + flip the run-state to PENDING_HUMAN. Unattended replay does not
+        block (wait=False) — an operator picks the run up out of band via the operator CLI."""
+        if self.controller is None:
+            return
+        try:
+            obs = self.surface.observe()
+            self.controller.escalate(
+                step=step, reason=reason, url=obs.url,
+                screenshot=f"screenshots/step-{step:02d}.png",
+                state_digest=f"{obs.title} @ {obs.url}",
+                capability=self.cap.capability_id, wait=False,
+            )
+        except Exception:
+            pass  # escalation is best-effort telemetry; never mask the underlying result
 
     def _perceive(self) -> tuple[Observation, str]:
         return self.surface.observe(), self.surface.page_text()

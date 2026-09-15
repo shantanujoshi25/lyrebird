@@ -24,13 +24,14 @@ def build_parser() -> argparse.ArgumentParser:
     d.add_argument("--headless", action="store_true", help="run the browser headless")
 
     sub.add_parser("replay", help="Deterministically replay a capability (C5).")
-    sub.add_parser("operator", help="Operator handoff console (C7).")
+    # operator delegates its own arg parsing to the handoff CLI (list/take/handback).
+    sub.add_parser("operator", help="Operator handoff console (C7).", add_help=False)
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
-    args = parser.parse_args(argv)
+    args, rest = parser.parse_known_args(argv)
     if args.command is None:
         parser.print_help()
         return 0
@@ -39,6 +40,10 @@ def main(argv: list[str] | None = None) -> int:
 
         run_readonly_discovery(args.url, headed=not args.headless)
         return 0
+    if args.command == "operator":
+        from lyrebird.handoff.operator_cli import main as operator_main
+
+        return operator_main(rest)  # list / take / handback
     print(f"'{args.command}' is not implemented yet — it lands in its construction phase.")
     return 1
 
