@@ -122,6 +122,9 @@ def member_detail(request: Request, member_id: str, inject: str | None = None) -
     if cond is C.Inject.PERMISSION_DENIED:
         return HTMLResponse(T.DETAIL_DENIED.render(member_id=member_id))
 
+    if cond is C.Inject.UNKNOWN_DIALOG:
+        return HTMLResponse(T.DETAIL_UNKNOWN_DIALOG.render(member_id=member_id))
+
     interstitial = cond is C.Inject.INTERSTITIAL
     return HTMLResponse(T.DETAIL.render(member_id=member_id, interstitial=interstitial))
 

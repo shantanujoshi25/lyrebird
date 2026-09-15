@@ -38,6 +38,9 @@ class DesktopSurface:
     def act(self, action: Action) -> ActionResult:
         raise NotImplementedError(_MSG)
 
+    def page_text(self) -> str:
+        raise NotImplementedError(_MSG)
+
     def snapshot(self, dir: Path) -> None:
         raise NotImplementedError(_MSG)
 
@@ -60,6 +63,9 @@ class LegacyWebSurface:
         raise NotImplementedError(_MSG)
 
     def act(self, action: Action) -> ActionResult:
+        raise NotImplementedError(_MSG)
+
+    def page_text(self) -> str:
         raise NotImplementedError(_MSG)
 
     def snapshot(self, dir: Path) -> None:

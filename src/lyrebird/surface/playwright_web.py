@@ -204,6 +204,20 @@ class PlaywrightWebSurface:
         except Exception:
             pass  # not every action triggers navigation; a timeout here is fine
 
+    def page_text(self) -> str:
+        """Visible innerText across the main frame and every iframe, joined.
+
+        Text conditions and output extraction read display text (e.g. the balance in the
+        workspace iframe), which the interactable-only collector doesn't capture.
+        """
+        parts: list[str] = []
+        for frame in self._page.frames:
+            try:
+                parts.append(frame.evaluate("() => document.body ? document.body.innerText : ''"))
+            except Exception:
+                continue
+        return "\n".join(p for p in parts if p)
+
     # ── evidence ──────────────────────────────────────────────────────────
     def snapshot(self, dir: Path) -> None:
         dir.mkdir(parents=True, exist_ok=True)

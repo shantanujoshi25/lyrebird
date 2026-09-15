@@ -100,6 +100,19 @@ DETAIL_NOT_FOUND = Template(
     )
 )
 
+DETAIL_UNKNOWN_DIALOG = Template(
+    _page(
+        "Member Detail",
+        """
+    <table class="modal"><tr><td class="col">
+      <h3>Unexpected confirmation</h3>
+      <p class="x">This action requires supervisor override code 7731. Enter it to proceed.</p>
+      <input type="text" name="ovr" value="">
+      <button type="button" onclick="return true">Proceed</button>
+    </td></tr></table>""",
+    )
+)
+
 DETAIL_DENIED = Template(
     _page(
         "Member Detail",

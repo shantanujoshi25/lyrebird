@@ -28,6 +28,7 @@ class Inject(str, Enum):
     SESSION_EXPIRY = "session_expiry_after_n"
     SLOW_LOAD = "slow_load"
     HTTP_500 = "http_500"
+    UNKNOWN_DIALOG = "unknown_dialog"   # an unexpected confirmation the flow doesn't know -> hard failure
 
     @classmethod
     def parse(cls, raw: str | None) -> "Inject":
