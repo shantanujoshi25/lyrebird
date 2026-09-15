@@ -1,0 +1,211 @@
+{
+  "schema_version": "1.0",
+  "capability_id": "open_subaccount",
+  "name": "Open a member sub-account (to review)",
+  "description": "Open the sub-account form for a member, fill it, and reach the review screen. The final Confirm step is risky and is gated in unattended replay.",
+  "version": 1,
+  "status": "draft",
+  "target": {
+    "app_id": "mock_cu",
+    "vendor": "lyrebird-mock",
+    "entry_url_pattern": "/member/*/subaccount",
+    "tenant": "base"
+  },
+  "inputs": [
+    {
+      "name": "member_id",
+      "type": "string",
+      "sensitive": false,
+      "example": "100001",
+      "description": null
+    },
+    {
+      "name": "amount",
+      "type": "string",
+      "sensitive": false,
+      "example": "250.00",
+      "description": null
+    }
+  ],
+  "outputs": [],
+  "steps": [
+    {
+      "index": 0,
+      "action": "type",
+      "target": {
+        "semantic_id": "initial_deposit_textbox",
+        "candidates": [
+          {
+            "strategy": "label_proximity",
+            "args": {
+              "label": "Initial deposit",
+              "role": "textbox"
+            },
+            "confidence": 0.8
+          }
+        ]
+      },
+      "value": "{{amount}}",
+      "wait_for": null,
+      "precondition": null,
+      "postcondition": null,
+      "on_conditions": [],
+      "risk": "safe",
+      "provenance": "model",
+      "page_fingerprint": null
+    },
+    {
+      "index": 1,
+      "action": "select",
+      "target": {
+        "semantic_id": "account_type_combobox",
+        "candidates": [
+          {
+            "strategy": "label_proximity",
+            "args": {
+              "label": "Account type",
+              "role": "combobox"
+            },
+            "confidence": 0.8
+          }
+        ]
+      },
+      "value": "money_market",
+      "wait_for": null,
+      "precondition": null,
+      "postcondition": null,
+      "on_conditions": [],
+      "risk": "safe",
+      "provenance": "model",
+      "page_fingerprint": null
+    },
+    {
+      "index": 2,
+      "action": "click",
+      "target": {
+        "semantic_id": "electronic_radio",
+        "candidates": [
+          {
+            "strategy": "visible_text",
+            "args": {
+              "text": "Electronic"
+            },
+            "confidence": 0.85
+          }
+        ]
+      },
+      "value": null,
+      "wait_for": null,
+      "precondition": null,
+      "postcondition": null,
+      "on_conditions": [],
+      "risk": "safe",
+      "provenance": "model",
+      "page_fingerprint": null
+    },
+    {
+      "index": 3,
+      "action": "click",
+      "target": {
+        "semantic_id": "member_authorized_this_action_checkbox",
+        "candidates": [
+          {
+            "strategy": "visible_text",
+            "args": {
+              "text": "Member authorized this action"
+            },
+            "confidence": 0.85
+          }
+        ]
+      },
+      "value": null,
+      "wait_for": null,
+      "precondition": null,
+      "postcondition": null,
+      "on_conditions": [],
+      "risk": "safe",
+      "provenance": "model",
+      "page_fingerprint": null
+    },
+    {
+      "index": 4,
+      "action": "click",
+      "target": {
+        "semantic_id": "continue_to_review_button",
+        "candidates": [
+          {
+            "strategy": "role_name",
+            "args": {
+              "role": "button",
+              "name": "Continue to review"
+            },
+            "confidence": 0.95
+          }
+        ]
+      },
+      "value": null,
+      "wait_for": null,
+      "precondition": null,
+      "postcondition": {
+        "by": "text",
+        "match": "Review"
+      },
+      "on_conditions": [],
+      "risk": "safe",
+      "provenance": "model",
+      "page_fingerprint": null
+    },
+    {
+      "index": 5,
+      "action": "click",
+      "target": {
+        "semantic_id": "confirm_and_open_account_button",
+        "candidates": [
+          {
+            "strategy": "role_name",
+            "args": {
+              "role": "button",
+              "name": "Confirm and open account"
+            },
+            "confidence": 0.95
+          }
+        ]
+      },
+      "value": null,
+      "wait_for": null,
+      "precondition": null,
+      "postcondition": null,
+      "on_conditions": [],
+      "risk": "risky",
+      "provenance": "model",
+      "page_fingerprint": null
+    }
+  ],
+  "known_conditions": [
+    {
+      "code": "VALIDATION_ERROR",
+      "klass": "business_outcome",
+      "detector": {
+        "by": "text",
+        "match": "Validation error"
+      },
+      "on_detect": "return_outcome",
+      "max_retries": 0
+    }
+  ],
+  "success_checkpoint": {
+    "by": "text",
+    "match": "Review"
+  },
+  "risk_summary": "Contains a risky Confirm step (index 5); blocked in unattended replay.",
+  "provenance": {
+    "discovery_run_id": "authored",
+    "model": "none",
+    "created_at": "2026-09-14T00:00:00Z",
+    "viewport": {
+      "width": 1280,
+      "height": 900,
+      "device_scale_factor": 1.0
+    }
+  }
+}
