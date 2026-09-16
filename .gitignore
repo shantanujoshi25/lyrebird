@@ -20,3 +20,7 @@ evidence/*/
 
 # Operating-rules file — local only, not part of the repo deliverable
 CLAUDE.md
+
+# Design docs and the report are kept local-only (user request)
+docs/
+REPORT.md
