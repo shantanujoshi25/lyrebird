@@ -20,6 +20,8 @@ from lyrebird.surface import Action, Observation, Surface
 from lyrebird.surface.playwright_web import PlaywrightWebSurface
 from lyrebird.surface.stubs import DesktopSurface, LegacyWebSurface
 
+pytestmark = pytest.mark.slow  # browser-driven
+
 USER = "teller"
 PASSWORD = "demo-pass-not-secret"
 MEMBER = "100001"

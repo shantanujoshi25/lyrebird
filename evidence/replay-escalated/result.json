@@ -1,0 +1,16 @@
+{
+  "status": "ESCALATED",
+  "outcome_code": null,
+  "outputs": {},
+  "failed_step": 5,
+  "expected": "approved artifact + confirm_risky",
+  "observed": "status=draft",
+  "fallback_depths": {
+    "0": 0,
+    "1": 0,
+    "2": 0,
+    "3": 0,
+    "4": 0
+  },
+  "evidence_dir": "evidence/replay-open_subaccount-20260915-211128"
+}

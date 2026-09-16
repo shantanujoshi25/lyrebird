@@ -1,0 +1,6 @@
+{"step": 0, "status": "ok", "url": "http://127.0.0.1:8000/member/100001/subaccount"}
+{"step": 1, "status": "ok", "url": "http://127.0.0.1:8000/member/100001/subaccount"}
+{"step": 2, "status": "ok", "url": "http://127.0.0.1:8000/member/100001/subaccount"}
+{"step": 3, "status": "ok", "url": "http://127.0.0.1:8000/member/100001/subaccount"}
+{"step": 4, "status": "ok", "url": "http://127.0.0.1:8000/member/100001/subaccount/review"}
+{"step": 5, "status": "risky-gate", "url": "http://127.0.0.1:8000/member/100001/subaccount/review"}

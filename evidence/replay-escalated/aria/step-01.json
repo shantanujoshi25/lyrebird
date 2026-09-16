@@ -1,0 +1,103 @@
+[
+  {
+    "index": 0,
+    "role": "textbox",
+    "name": "250.00",
+    "value": "250.00",
+    "bbox": [
+      138,
+      82,
+      153,
+      21
+    ],
+    "container_path": [],
+    "nearby_text": [
+      "Initial deposit",
+      "Initial deposit"
+    ]
+  },
+  {
+    "index": 1,
+    "role": "combobox",
+    "name": "Money Market",
+    "value": "money_market",
+    "bbox": [
+      138,
+      107,
+      107,
+      19
+    ],
+    "container_path": [],
+    "nearby_text": [
+      "Account type\t\nSavings\nChecking\nMoney Market",
+      "Account type"
+    ]
+  },
+  {
+    "index": 2,
+    "role": "radio",
+    "name": "Paper (unchecked)",
+    "value": "paper",
+    "bbox": [
+      143,
+      133,
+      13,
+      13
+    ],
+    "container_path": [],
+    "nearby_text": [
+      "Statement delivery\t Paper  Electronic",
+      "Statement delivery"
+    ]
+  },
+  {
+    "index": 3,
+    "role": "radio",
+    "name": "Electronic (unchecked)",
+    "value": "electronic",
+    "bbox": [
+      209,
+      133,
+      13,
+      13
+    ],
+    "container_path": [],
+    "nearby_text": [
+      "Statement delivery\t Paper  Electronic",
+      "Statement delivery"
+    ]
+  },
+  {
+    "index": 4,
+    "role": "checkbox",
+    "name": "Member authorized this action (unchecked)",
+    "value": "on",
+    "bbox": [
+      142,
+      157,
+      13,
+      13
+    ],
+    "container_path": [],
+    "nearby_text": [
+      "Authorization\t Member authorized this action",
+      "Authorization"
+    ]
+  },
+  {
+    "index": 5,
+    "role": "button",
+    "name": "Continue to review",
+    "value": "",
+    "bbox": [
+      138,
+      178,
+      126,
+      21
+    ],
+    "container_path": [],
+    "nearby_text": [
+      "Continue to review"
+    ]
+  }
+]

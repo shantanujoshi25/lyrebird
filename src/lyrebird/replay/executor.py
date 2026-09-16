@@ -44,13 +44,21 @@ class ReplayContext:
 
 class ReplayEngine:
     def __init__(self, cap: Capability, surface: Surface, policy: Policy, *, evidence_dir: str = "",
-                 controller: "object | None" = None) -> None:
+                 controller: "object | None" = None, on_step: "Callable[[int, str], None] | None" = None) -> None:
         self.cap = cap
         self.surface = surface
         self.policy = policy
         self.evidence_dir = evidence_dir
         self.controller = controller  # optional SessionController: makes escalation a REAL handoff
+        self.on_step = on_step        # optional evidence hook: (step_index, status) -> writes a snapshot
         self._recorded_vp = cap.provenance.viewport
+
+    def _emit_step(self, step_index: int, status: str) -> None:
+        if self.on_step is not None:
+            try:
+                self.on_step(step_index, status)
+            except Exception:
+                pass  # evidence writing must never break a replay
 
     def run(self, ctx: ReplayContext) -> ReplayResult:
         fallback_depths: dict[int, int] = {}
@@ -59,12 +67,14 @@ class ReplayEngine:
             # 1. risky-step gate (R4): block unless approved + confirm_risky, else escalate.
             if classify_risk(self.policy, step) is Risk.RISKY:
                 if not (self.cap.status == "approved" and ctx.confirm_risky):
+                    self._emit_step(step.index, "risky-gate")
                     self._escalate(step.index, "risky step requires human authorization")
                     return self._result("ESCALATED", outcome_code=None, failed_step=step.index,
                                         expected="approved artifact + confirm_risky", observed=f"status={self.cap.status}",
                                         fallback_depths=fallback_depths)
 
             outcome = self._run_step(step, ctx, fallback_depths)
+            self._emit_step(step.index, outcome.status if outcome else "ok")
             if outcome is not None:
                 return outcome  # a business outcome or a hard failure short-circuits
 

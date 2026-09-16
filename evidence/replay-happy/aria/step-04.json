@@ -1,0 +1,36 @@
+[
+  {
+    "index": 0,
+    "role": "link",
+    "name": "Open sub-account",
+    "value": null,
+    "bbox": [
+      11,
+      349,
+      116,
+      18
+    ],
+    "container_path": [],
+    "nearby_text": [
+      "Member 100001\n\nOpen sub-account"
+    ]
+  },
+  {
+    "index": 1,
+    "role": "button",
+    "name": "Refresh balance",
+    "value": "",
+    "bbox": [
+      25,
+      198,
+      113,
+      21
+    ],
+    "container_path": [
+      "frame:http://127.0.0.1:8000/workspace/member/100001"
+    ],
+    "nearby_text": [
+      "Ada Lovelace\nChecking\t$0.00\nSavings\t$4,210.75\nRefresh balance"
+    ]
+  }
+]

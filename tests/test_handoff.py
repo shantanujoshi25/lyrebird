@@ -21,6 +21,8 @@ from lyrebird.policy import Policy
 from lyrebird.surface.base import Action
 from lyrebird.surface.playwright_web import PlaywrightWebSurface
 
+pytestmark = pytest.mark.slow  # browser-driven
+
 ROOT = Path(__file__).resolve().parents[1]
 POLICY = Policy.load(ROOT / "policy.yaml")
 

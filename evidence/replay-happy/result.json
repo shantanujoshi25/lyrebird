@@ -1,0 +1,18 @@
+{
+  "status": "SUCCESS",
+  "outcome_code": null,
+  "outputs": {
+    "savings_balance": 4210.75
+  },
+  "failed_step": null,
+  "expected": null,
+  "observed": null,
+  "fallback_depths": {
+    "0": 0,
+    "1": 0,
+    "2": 0,
+    "3": 0,
+    "4": 0
+  },
+  "evidence_dir": "evidence/replay-lookup_savings_balance-20260915-211202"
+}

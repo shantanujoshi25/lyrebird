@@ -26,6 +26,8 @@ from lyrebird.evidence import EvidenceWriter
 from lyrebird.policy import Policy
 from lyrebird.surface.playwright_web import PlaywrightWebSurface
 
+pytestmark = pytest.mark.slow  # browser-driven
+
 POLICY_YAML = Path(__file__).resolve().parents[1] / "policy.yaml"
 MEMBER = "100001"
 

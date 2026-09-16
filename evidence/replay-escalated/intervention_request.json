@@ -1,0 +1,9 @@
+{
+  "run_id": "replay-open_subaccount-20260915-211128",
+  "capability": "open_subaccount",
+  "step": 5,
+  "url": "http://127.0.0.1:8000/member/100001/subaccount/review",
+  "reason": "risky step requires human authorization",
+  "screenshot": "screenshots/step-05.png",
+  "state_digest": "Review Sub-account @ http://127.0.0.1:8000/member/100001/subaccount/review"
+}

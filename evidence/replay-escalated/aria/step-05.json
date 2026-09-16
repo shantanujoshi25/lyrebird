@@ -1,0 +1,18 @@
+[
+  {
+    "index": 0,
+    "role": "button",
+    "name": "Confirm and open account",
+    "value": "",
+    "bbox": [
+      11,
+      169,
+      172,
+      21
+    ],
+    "container_path": [],
+    "nearby_text": [
+      "Review\nMember\t100001\nInitial deposit\t250.00\nAccount type\tMoney Market\nStatement delivery\tElectronic\nConfirm and open acc"
+    ]
+  }
+]

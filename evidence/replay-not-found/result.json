@@ -1,0 +1,16 @@
+{
+  "status": "BUSINESS_OUTCOME",
+  "outcome_code": "NOT_FOUND",
+  "outputs": {},
+  "failed_step": 4,
+  "expected": null,
+  "observed": null,
+  "fallback_depths": {
+    "0": 0,
+    "1": 0,
+    "2": 0,
+    "3": 0,
+    "4": 0
+  },
+  "evidence_dir": "evidence/replay-lookup_savings_balance-20260915-211205"
+}
