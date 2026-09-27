@@ -84,7 +84,7 @@ Each run writes a redacted evidence directory under `evidence/`. Committed examp
 ## Tests
 
 ```sh
-uv run pytest        # 43 tests, no browser, ~0.3s
+uv run pytest        # 48 tests, no browser, ~0.3s
 ```
 
 Replay, policy, schema, and recorder all run **with no LLM**. A subprocess import guard

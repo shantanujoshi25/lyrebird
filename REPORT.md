@@ -1,20 +1,28 @@
 # lyrebird — Design Report
 
-A computer-use automation system for legacy back-office apps with no API. You give a goal in
-plain English; an **LLM discovers** the UI flow once — verifying each action as it goes — and
-the successful run is distilled into a typed, versioned **Capability** artifact. That artifact
-**replays deterministically and LLM-free**, escalating to a **human** when it can't safely
-proceed. Safety, evidence, and handoff wrap all three. Everything below is built and tested
-(43 tests, `pytest` runs them in ~0.3s with no browser); a real `claude-sonnet-4-6` discovery
-run is committed under `evidence/`.
+A computer-use automation system for legacy back-office apps that have no API. You give a goal
+in plain English; an **LLM discovers** the UI flow once, and the successful run is frozen into a
+typed, versioned **Capability** artifact. From then on that artifact **replays deterministically,
+with no LLM in the decision loop** — and escalates to a **human** when it can't safely proceed.
+
+The whole system is that one arc:
+
+> **goal → (LLM) discover → Capability artifact → (no LLM) replay → result**
+
+Discovery is slow, costly, and non-deterministic, so we pay for it once; replay is cheap and
+identical every time, so it's what a production agent actually calls. Everything else — safety,
+evidence, human handoff — wraps those two halves. Built and tested: **48 tests**, run in ~0.3s
+with no browser and no API key; one real `claude-sonnet-4-6` discovery run is committed under
+`evidence/`.
 
 ## 1. Architecture
 
-Single process, Python 3.12, three CLI verbs (`discover`, `replay`, `operator`). Dependency
-direction is strictly downward — `cli → {discovery, replay, handoff} → {surface, recorder,
-capability, policy, evidence}`; `capability/` and `policy/` are leaves.
+Single process, Python 3.12, three CLI verbs — `discover` (the LLM run), `replay` (the
+deterministic run), and `operator` (the human handoff console). Dependencies point strictly
+downward: `cli → {discovery, replay, handoff} → {surface, recorder, capability, policy,
+evidence}`, with `capability/` and `policy/` as pure leaves.
 
-```
+```text
 surface/     perceive/act seam: Surface protocol + PlaywrightWebSurface + Desktop/LegacyWeb stubs
              — also owns durable-locator RESOLUTION (the only module that knows "DOM")
 discovery/   the LLM observe→decide→policy→act→read loop  (the ONLY module importing the LLM client)
@@ -32,14 +40,17 @@ surface-agnostic and speaks only `role / name / value / locators`; only `Playwri
 knows the word "DOM." (2) `capability/` is the LLM/deterministic seam: the artifact is the
 contract that lets the LLM-driven half hand off to the LLM-free half.
 
-**Key decision — trust the DOM; split the job by phase.** Discovery works from a screenshot +
-a numbered element list (Set-of-Marks) and picks an element by index — the honest answer to
-"no clean DOM." But once the LLM has pointed at a node, we don't reconstruct it from text: we
-read the node's own **durable handles** straight off the DOM (id, `name`, stable `data-*`, ARIA
-role+name, exact text, and — for a value cell — its label anchor). Replay re-resolves those with
-real Playwright locators. The bet the brief invites: back-office UIs have *stable DOMs*, so a
-handle captured off the node is a reliable, deterministic locator — far more so than coordinates
-(non-deterministic across renders) or reconstructed-text heuristics (guess at the app's meaning).
+**Key decision — trust the DOM, and split the job by phase.** During discovery the LLM works
+from a screenshot with numbered elements (Set-of-Marks) and points at one by index — the honest
+answer to "no clean DOM." But the moment it points, we stop guessing: we read that node's own
+**durable handles** straight off the page (its id, `name`, a stable `data-*`, its ARIA role +
+name, its exact text, and — for a value cell — the label next to it). Replay re-finds the node
+with those handles via real Playwright locators.
+
+This leans on a property the brief calls out: back-office UIs have *stable DOMs*. So a handle
+taken from the node itself is a reliable locator — more so than screen coordinates (which move
+when anything re-renders) or text-reconstruction heuristics (which are really *our* code guessing
+what the page means).
 
 **The LLM is the brain; our code is mechanism.** The surface reports every handle a node *has*,
 without deciding. At `read_value` the LLM makes the judgment only it can: is this output value
@@ -50,23 +61,28 @@ they kept encoding *our* guesses about the app instead of letting the model deci
 
 ## 2. Artifact schema
 
-The deepest investment (`capability/schema.py`, Pydantic v2, JSON Schema exported to
-`artifacts/capability.schema.json`). A `Capability` carries `schema_version` + `version` +
-`status` (draft|approved), the originating natural-language `goal`, a `target`
-(app/vendor/entry-pattern/tenant), typed `inputs` (with a `sensitive` flag) and `outputs`, ordered
-`steps` (each with a verified `postcondition` and `provenance` of `model`|`human`),
-`known_conditions`, a `success_checkpoint`, a `risk_summary`, and `provenance`.
+The deepest investment (`capability/schema.py`, Pydantic v2; the JSON Schema is exported to
+`artifacts/capability.schema.json` for the calling agent). A `Capability` is:
 
-Four deliberate schema decisions:
+- **identity & lifecycle** — `capability_id`, `version`, `schema_version`, `status`
+  (`draft`|`approved`), and the natural-language `goal` it came from;
+- **the contract** — a `target` (app / vendor / entry-pattern / tenant), typed `inputs` (each with
+  a `sensitive` flag) and typed `outputs`;
+- **the flow** — ordered `steps`, each with a locator `target`, a verified `postcondition`, a
+  `risk` flag, and `provenance` (`model` or `human`);
+- **runtime knowledge** — `known_conditions` (the taxonomy below), a `success_checkpoint`, a
+  `risk_summary`, and `provenance` linking to the discovery run.
 
-- **One durable locator, used for both targets and outputs.** A `DurableLocator` is a stable
-  `semantic_id` plus an ordered `candidates` list, most-stable-first. Each `LocatorCandidate` has
-  a `kind` (`css` | `role` | `text` | `label` | `nth`), a `value`, an optional accessible `name`
-  (for `role`), and an optional `frame`. Candidate order *is* the fallback order at replay and the
-  drift signal (the winning index = fallback depth). There is **no CSS-selector grammar and no
-  XPath as a strategy the LLM authors** — `css` here means a concrete structural handle the DOM
-  node already has (`#id`, `[name=…]`, `[data-testid=…]`), never a hand-written brittle class
-  chain; the durable kinds all map onto an OS accessibility API too, so the artifact isn't web-only.
+Four decisions shaped it:
+
+- **One durable locator, used for both step targets and output values.** A `DurableLocator` is a
+  stable `semantic_id` plus an ordered list of `candidates`, most-stable first. Each candidate is a
+  `kind` (`css` | `role` | `text` | `label` | `nth`) and a `value` (plus an accessible `name` for
+  `role`, and an optional `frame`). The order matters: replay tries them top-down, and *which one
+  wins* is the drift signal (winning index = "fallback depth"). Note `css` here is a concrete
+  handle the node already has — `#id`, `[name=…]`, `[data-testid=…]` — never a hand-written class
+  chain, and there is no XPath. Every kind also has an OS-accessibility equivalent, so the artifact
+  is not web-only.
 - **A value cell is anchored on its LABEL, by the LLM's judgment.** A balance's own text *is* the
   value and changes every run, so it's useless as a locator. For a variable output the recorder
   puts a `label` candidate (`"the cell next to 'Savings'"`) first, per the LLM's `value_stability`
@@ -86,7 +102,7 @@ Four deliberate schema decisions:
 **The determinism invariant, enforced structurally:** the `replay` package has **no import path
 to the LLM client** — a subprocess test imports it and asserts the Anthropic SDK is absent from
 `sys.modules`. Replay makes zero action-deciding LLM calls, ever. The only production LLM use is
-an optional *diagnostic text for a human* on a genuine deviation (§5), which is logged and shown,
+an optional *diagnostic text for a human* on a genuine deviation (Section 5), which is logged and shown,
 never fed to an action.
 
 - **Locator resolution lives in the Surface.** Replay hands a `DurableLocator` to the surface,
@@ -158,7 +174,7 @@ observed Y") shown to the operator — **text only, never an action** — and th
 for offline artifact update, never live self-modification. In **discovery**, the same machinery
 lets a stuck LLM defer to a human **teacher** whose manual step is captured (element descriptors →
 the same durable locator, stamped `provenance: human`) and folded into the artifact so it replays
-deterministically. The risky-step gate is enforced by the executor (§6); the discovery-side
+deterministically. The risky-step gate is enforced by the executor (Section 6); the discovery-side
 controller wiring is the documented cut.
 
 ## 6. Safety
@@ -188,7 +204,7 @@ slice, and documented seams.
 Deliberate, documented, all stubbed at real seams:
 
 - **The mutating `open_subaccount` artifact is authored, not LLM-discovered.** It exists to
-  exercise the risky-step gate + handoff (§5), which needs a risky flow, not another discovery
+  exercise the risky-step gate + handoff (Section 5), which needs a risky flow, not another discovery
   proof — the lookup capability already covers real discovery. Its step locators were read off the
   live mock DOM so they resolve deterministically; a full discovery run of it is a token cost with
   little marginal signal. Next (cheap): record it via the LLM too, for symmetry.

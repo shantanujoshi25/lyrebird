@@ -7,20 +7,20 @@ whole system.
 
 > **The design in four ideas, each detailed below:**
 > 1. **Interactive NL entry point** — you give a goal + URL in plain English; the agent
->    *infers* the typed input/output contract from the goal and confirms it (§5, §5a). No
+>    *infers* the typed input/output contract from the goal and confirms it (Sections 5 and 5a). No
 >    per-site scripts.
 > 2. **Discovery verifies each action** — after acting, the agent re-observes and confirms the
 >    action did what it intended before recording the step, capturing a *verified postcondition*
->    (§5).
+>    (Section 5).
 > 3. **Durable locators, the LLM's judgment** — for every element the LLM points at, we capture
 >    the node's own stable handles (id / name / data-\* / role+name / text / label anchor). At
 >    `read_value` the LLM judges whether an output value is *variable* or *fixed* and, if
 >    variable, which stable **label** anchors it — so replay re-reads it even when the value
->    itself changes, with no per-site rules and no data-type guessing (§4.2, §7.3).
+>    itself changes, with no per-site rules and no data-type guessing (Sections 4.2 and 7.3).
 > 4. **Replay is agent-*supervised*** — deterministic on the happy path (zero LLM), it checks
 >    each recorded postcondition; a genuine deviation escalates to a **human**, and the LLM's
 >    only role in production is a *diagnostic text* for that human — it never decides or acts
->    (§8, §8a).
+>    (Sections 8 and 8a).
 
 ---
 
@@ -152,7 +152,7 @@ Everything funnels through the **`surface/`** layer to touch the browser, and th
 1. **`surface/` is the "perceive/act seam."** Nothing above it knows it's a browser. It
    speaks only in generic terms — *role, name, value, durable locators* — and it owns locator
    *resolution*, so only `playwright_web.py` knows the word "DOM." This is what would let you add
-   a desktop-app surface later without touching discovery/replay. (More in §9.)
+   a desktop-app surface later without touching discovery/replay. (More in Section 9.)
 2. **`replay/` never imports the LLM.** This is enforced by an actual test
    (`tests/test_no_llm_in_replay.py`) that imports the replay package in a fresh process and
    asserts the Anthropic library was never loaded. If someone accidentally couples them, CI
@@ -232,7 +232,7 @@ Playwright's `evaluate`) that walks the DOM and returns a compact list of:
 1. **Interactables** — links, buttons, inputs, selects, anything with a role or an `onclick`.
 2. **Value-bearing text cells** — table cells (`<td>`/`<th>`) that contain a number/currency
    and aren't themselves clickable. *This is why the system can now "read the balance" as a
-   first-class element* (see §7.3). Each such cell gets role `"text"`.
+   first-class element* (see Section 7.3). Each such cell gets role `"text"`.
 
 For **iframes**, it runs that same JavaScript in *every* frame and **flattens** them into one
 list, tagging each element with a `container_path` like `["frame:workspace"]`. So the rest of
@@ -251,7 +251,7 @@ e.g. "Savings") → a last-resort tag ordinal (`td@4`). We deliberately do **not
 class chains. These are concrete handles the node *actually has*, so replay can re-find the same
 node with a real Playwright locator (`page.locator("#id")`, `get_by_role(...)`, `get_by_text(...)`).
 The surface just *reports* every handle a node has; it doesn't decide which one matters — the LLM
-does that at `read_value` (§7.3). This is why a stable-DOM legacy app replays reliably.
+does that at `read_value` (Section 7.3). This is why a stable-DOM legacy app replays reliably.
 
 **Set-of-Marks (SoM):** the technique of numbering interactable elements and giving the LLM a
 screenshot plus a list like `[5] button 'Sign in'`. The model picks a *number*; we map it
@@ -319,7 +319,7 @@ Walking through the important mechanics:
   model ("expected X but it didn't appear — the action may not have worked") so it can retry
   instead of recording a step that didn't achieve its intent. This is the model *verifying its
   own work* — the fix for silently recording a broken step.
-- **`read_value` — the LLM's judgment about each output** (see §7.3): before finishing, the model
+- **`read_value` — the LLM's judgment about each output** (see Section 7.3): before finishing, the model
   points at the value's element by `index`, reports the **value it sees** (ground truth), and — the
   part only it can judge — says whether the value is **variable** (changes with the inputs, like a
   balance) or **fixed**, and if variable, which stable **`anchor_label`** the value sits next to
@@ -329,9 +329,9 @@ Walking through the important mechanics:
   differ next run. Our code never guesses data types; the model decides.
 - **Stop conditions:** `finish(success=true)`; **max steps** (a budget so it can't loop
   forever); a **dead-end guard** that detects the model repeating the identical action and stops
-  (escalating to a human — §11); and, when the LLM is genuinely stuck, a **human-teach handoff**
+  (escalating to a human — Section 11); and, when the LLM is genuinely stuck, a **human-teach handoff**
   where a person performs the step on the same live session and their moves are captured as
-  re-resolvable steps stamped `provenance: human` (§9). There's also an auto-finish if the model
+  re-resolvable steps stamped `provenance: human` (Section 9). There's also an auto-finish if the model
   keeps re-reading an already-captured output.
 - **Every step is logged, redacted, to an evidence directory** (`evidence/writer.py`) —
   screenshots (with sensitive fields masked), the element list, and a JSONL trace of decisions.
@@ -349,7 +349,7 @@ You don't hand-write a script per site. `lyrebird discover` asks three things in
 3. **Credentials** — *"Do you already have a username and password?"* If yes, they're collected
    without echo (via `getpass`) and handled as sensitive params (password never stored). If no,
    the agent proceeds and falls back to the **human-teach handoff** if it hits a login it can't do
-   (§11). For a non-interactive run (no TTY), `scripts/discover_mock.py` drives the same loop with
+   (Section 11). For a non-interactive run (no TTY), `scripts/discover_mock.py` drives the same loop with
    credentials from `.env` — that's what produces the committed evidence.
 
 From the goal alone, one cheap LLM call (`contract.py`) **infers the typed contract** — which
@@ -371,13 +371,13 @@ durable locator** for each element.
 **Term — locator:** a description of *how to find an element again later*. A brittle locator
 is "the 5th element" or "the element at pixel (92,176)". A durable locator is a concrete handle
 the node actually has — `#account-id`, `[name="q"]`, an ARIA role+name, exact text. The Surface
-already captured these off each node during `observe()` (§4.2); the recorder just wraps them into
+already captured these off each node during `observe()` (Section 4.2); the recorder just wraps them into
 a `DurableLocator` (an ordered `candidates` list) per step target, verbatim. There's no
 locator-*synthesis* heuristic here anymore — the node reported its own handles.
 
 **Why a *list* and not one locator?** Because at replay time the surface tries them in order and
 uses the first that yields exactly one match. Which candidate wins tells us how much the page has
-*drifted* from when it was recorded — the "fallback depth" is a built-in drift signal (§7.2).
+*drifted* from when it was recorded — the "fallback depth" is a built-in drift signal (Section 7.2).
 
 **Output locators carry the LLM's judgment.** For each `read_value`, the recorder builds the
 output's `DurableLocator` from the trajectory: for a **variable** value it leads with the
@@ -536,7 +536,7 @@ member; the recorder substitutes, the executor substitutes the live value back.)
 This is the production path: given an artifact + fresh inputs, do the flow. The **decision loop
 is LLM-free** — the agent *supervises* deterministically. On the happy path and for all known
 conditions, **zero LLM calls**. The model reappears only to write a *diagnostic for a human* on
-a genuine deviation (§8a) — it never decides or acts.
+a genuine deviation (Section 8a) — it never decides or acts.
 
 ```mermaid
 sequenceDiagram
@@ -586,7 +586,7 @@ The three sub-parts:
   taxonomy (`known_conditions`): a business outcome is returned, a recoverable one is handled
   *and the step re-attempted* (a dismissed popup is only useful if you then redo what you were
   doing), a hard one fails. If the postcondition fails and **no** known condition explains it,
-  that's a **deviation** → §8a. After all steps: verify the success checkpoint, then read each
+  that's a **deviation** → Section 8a. After all steps: verify the success checkpoint, then read each
   output via its `DurableLocator` and cast to the declared type. Produces a `ReplayResult`.
 
 **Determinism techniques worth naming:**
@@ -609,7 +609,7 @@ in a strictly bounded way (`make_deviation_handler`):
 
 1. The LLM produces a short **diagnostic text**: "expected X, observed Y, likely cause…". It is
    given no tools and returns a string.
-2. The engine **escalates to a human** (`SessionController`, §9): writes an intervention request
+2. The engine **escalates to a human** (`SessionController`, Section 9): writes an intervention request
    with the diagnostic, flips the run state to `PENDING_HUMAN`.
 3. The deviation is **logged for offline artifact update** — we never self-modify a deterministic
    capability live; a human reviews and re-records later. (Building that review pipeline is a
@@ -696,9 +696,9 @@ both handoff triggers:
 
 | | **Discovery** handoff | **Production (replay)** handoff |
 |---|---|---|
-| Trigger | the LLM is stuck / can't derive a step | a genuine deviation (§8a) |
+| Trigger | the LLM is stuck / can't derive a step | a genuine deviation (Section 8a) |
 | Human is the… | **teacher** — performs the step the LLM couldn't | **decision-maker** — resolves the unexpected state |
-| What the LLM does | nothing (it gave up) | **diagnostic text only** (§8a) |
+| What the LLM does | nothing (it gave up) | **diagnostic text only** (Section 8a) |
 | What we capture | the human's moves → **re-resolvable steps** stamped `provenance: human`, folded into the artifact (so they replay deterministically later) | the human's moves + the deviation → **logged for offline artifact update** |
 
 Because a captured human move carries a full element descriptor, the recorder builds the **same
