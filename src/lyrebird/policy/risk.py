@@ -34,5 +34,7 @@ def _step_text(step: Step) -> str:
         parts.append(step.value)
     if step.target:
         for cand in step.target.candidates:
-            parts.extend(str(v) for v in cand.args.values())
+            parts.append(cand.value)
+            if cand.name:
+                parts.append(cand.name)
     return " ".join(parts)

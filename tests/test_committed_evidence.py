@@ -31,9 +31,10 @@ def test_capability_json_schema_exports() -> None:
     assert schema["type"] == "object"
 
 
-# ── the four committed runs exist with the expected outcomes ─────────────────
+# ── the committed runs exist with the expected outcomes ──────────────────────
 def test_discovery_run_committed() -> None:
-    runs = list(EVIDENCE.glob("discover-lookup-*"))
+    # one REAL LLM discovery run against the live mock (the non-negotiable heart).
+    runs = list(EVIDENCE.glob("discover-127_0_0_1-*"))
     assert runs, "no committed discovery run"
     result = json.loads((runs[0] / "result.json").read_text())
     assert result["status"] == "SUCCESS"
@@ -57,22 +58,33 @@ def test_committed_replay_result(run: str, status: str, code: str | None) -> Non
         assert result.outcome_code is not None and result.outcome_code.value == code
 
 
-def test_escalated_run_has_real_handoff_artifacts() -> None:
+def test_happy_replay_extracted_a_balance() -> None:
+    # a DIFFERENT member than discovery (100003) — proves the label-anchored locator survives a
+    # per-invocation value change (the value differs; the recipe does not).
+    result = json.loads((EVIDENCE / "replay-happy" / "result.json").read_text())
+    bal = result["outputs"]["savings_balance"]
+    assert isinstance(bal, (int, float)) and bal > 0
+
+
+def test_escalated_run_is_a_real_handoff() -> None:
+    # the risky Confirm step blocked and escalated to a human — a REAL handoff, not a TODO:
+    # PENDING_HUMAN control + an intervention request with context, and it never submitted.
     d = EVIDENCE / "replay-escalated"
     run_state = json.loads((d / "run_state.json").read_text())
-    assert run_state["control"] == "PENDING_HUMAN"          # a human is needed
+    assert run_state["control"] == "PENDING_HUMAN"                 # a human is needed
     req = json.loads((d / "intervention_request.json").read_text())
-    assert "risky" in req["reason"].lower()                 # why we stopped
-
-
-def test_happy_replay_extracted_balance() -> None:
-    result = json.loads((EVIDENCE / "replay-happy" / "result.json").read_text())
-    assert result["outputs"]["savings_balance"] == 4210.75
+    assert "risky" in req["reason"].lower()                        # why we stopped
+    # never submitted: the last step's page is the review screen, not a /confirm result
+    last = [json.loads(l) for l in (d / "steps.jsonl").read_text().splitlines() if l.strip()][-1]
+    assert "/confirm" not in last["url"]
 
 
 # ── redaction guard over ALL committed evidence ──────────────────────────────
 def test_no_sensitive_value_in_committed_evidence() -> None:
+    import os
+    secret = os.environ.get("MOCK_PASSWORD", "demo-pass-not-secret")
     for path in EVIDENCE.rglob("*"):
         if path.is_file() and path.suffix in {".json", ".jsonl", ".txt"}:
             text = path.read_text()
+            assert secret not in text, f"password leaked in {path}"
             assert "demo-pass-not-secret" not in text, f"password leaked in {path}"

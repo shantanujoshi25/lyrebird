@@ -36,20 +36,29 @@ class OutcomeCode(str, Enum):
     CHECKPOINT_FAILED = "CHECKPOINT_FAILED"
 
 
-class LocatorStrategy(str, Enum):
-    """The A12 invariant lives here: every member must be answerable on web AND desktop-AX.
+class LocatorKind(str, Enum):
+    """How to re-find an element. These are the durable handles the discovery pass reads
+    STRAIGHT OFF the DOM node the LLM pointed at — most-stable first. They map cleanly to both
+    web (Playwright) and desktop-AX, so an artifact isn't web-only:
 
-    CSS and XPath are deliberately ABSENT — they have no desktop-AX equivalent, so a
-    candidate using them would make the artifact web-only. Because this is an enum, any
-    non-member value (e.g. "css") fails Pydantic validation automatically — the surface-
-    agnostic invariant is enforced structurally, not by a manual check.
+      css   -> a stable structural selector: #id, [name=], [data-*=] (NOT brittle class chains)
+      role  -> ARIA role + accessible name (Playwright get_by_role; AX has the same pair)
+      text  -> exact visible text (get_by_text; AX name match)
+      label -> a value cell anchored on its stable LABEL ("the cell next to 'Savings'") — the
+               only durable handle a bare value cell has, since its own text is the value and
+               changes per run. `value` holds the label text.
+      nth   -> tag + ordinal within the frame — last resort, only when nothing else is stable
+
+    We store several, ordered; replay tries them in order and the winning index is the drift
+    signal (§7). We do NOT synthesize these from reconstructed text — they come from the real
+    node, which is why old back-office apps (stable DOM) replay reliably.
     """
 
-    ROLE_NAME = "role_name"
-    VISIBLE_TEXT = "visible_text"
-    LABEL_PROXIMITY = "label_proximity"
-    RELATIVE_ANCHOR = "relative_anchor"
-    BBOX = "bbox"  # last resort; only fires when replay viewport matches provenance (A14)
+    CSS = "css"
+    ROLE = "role"
+    TEXT = "text"
+    LABEL = "label"
+    NTH = "nth"
 
 
 class Risk(str, Enum):
@@ -59,14 +68,20 @@ class Risk(str, Enum):
 
 # ── locators ───────────────────────────────────────────────────────────────
 class LocatorCandidate(BaseModel):
-    strategy: LocatorStrategy       # WHY: candidate order = fallback depth = drift signal (§7)
-    args: dict[str, str] = {}       # WHY: strategy-specific (role+name / text / anchor+relation / x,y,w,h)
-    confidence: float = Field(ge=0, le=1)  # WHY: recorder's trust; lower = try later / flag drift
+    kind: LocatorKind               # WHY: how to resolve this candidate (css/role/text/nth)
+    value: str                      # WHY: the selector / text / nth expression itself
+    name: str | None = None         # WHY: accessible name, for kind=role (get_by_role(value, name=name))
+    frame: str | None = None        # WHY: the iframe this node lives in (None = main frame)
 
 
-class LocatorSpec(BaseModel):
-    semantic_id: str                # WHY: stable handle ("member_search_input") — the multi-tenant override key (A5)
-    candidates: list[LocatorCandidate] = Field(min_length=1)  # WHY: ordered fallback; replay requires exactly ONE match (R3)
+class DurableLocator(BaseModel):
+    """An ordered set of concrete handles to ONE DOM node, captured from the node itself at
+    discovery. Replay tries candidates in order; the first that resolves to exactly one element
+    wins, and its index is the fallback depth (drift telemetry, §7). Used for BOTH step targets
+    and output values — one uniform locator, no per-purpose grammar."""
+
+    semantic_id: str                # WHY: stable, human-readable handle — the multi-tenant override key (A5)
+    candidates: list[LocatorCandidate] = Field(min_length=1)  # WHY: ordered fallback, most-stable first (§7)
 
 
 # ── inputs / outputs: the callable contract (R2) ─────────────────────────────
@@ -78,7 +93,7 @@ class InputParam(BaseModel):
     description: str | None = None
 
     @model_validator(mode="after")
-    def _sensitive_has_no_real_example(self) -> "InputParam":
+    def _sensitive_has_no_real_example(self) -> InputParam:
         # A7 leak guard: a sensitive param's example is persisted in the artifact, so it must
         # not be a real secret. Discovery reads sensitive values from env at run time, not
         # from the artifact — so a sensitive param carries no example at all.
@@ -91,10 +106,14 @@ class InputParam(BaseModel):
 
 
 class OutputSpec(BaseModel):
+    """A declared output: replay resolves `locator` to the SAME DOM node the LLM read at
+    discovery, reads its text/value, and casts to `type`. The locator is durable (captured off
+    the node), so the value can change per run but the recipe doesn't — the read stays stable."""
+
     name: str                       # WHY: e.g. "savings_balance" — what the caller gets back
-    type: Literal["string", "integer", "number", "boolean"]
-    extract: "LocatorSpec"          # WHY: outputs are extracted by the same locator machinery
-    transform: Literal["text", "number", "currency"] | None = None  # WHY: typed output shape (R2)
+    type: Literal["string", "integer", "number", "boolean"]  # WHY: replay casts the read text to this
+    locator: DurableLocator | None = None      # WHY: how replay re-finds the element to read (None until recorded)
+    value_seen: str = ""            # WHY: the value the LLM saw — ground truth for a replay sanity-check
 
 
 # ── conditions: the taxonomy made detectable ─────────────────────────────────
@@ -115,7 +134,7 @@ class KnownCondition(BaseModel):
 class Step(BaseModel):
     index: int
     action: Literal["click", "type", "select", "scroll", "navigate", "press"]
-    target: LocatorSpec | None = None       # WHY: null for navigate / global press
+    target: DurableLocator | None = None    # WHY: null for navigate / global press
     value: str | None = None                # WHY: literal OR "{{param}}" — sensitive params never stored as literals (A13)
     wait_for: ConditionDetector | None = None      # WHY: condition-based waiting, no sleeps (§7)
     precondition: ConditionDetector | None = None
@@ -153,6 +172,7 @@ class Capability(BaseModel):
     capability_id: str              # WHY: stable id across versions
     name: str
     description: str
+    goal: str | None = None         # WHY: the NL goal that produced it — provenance + reviewability (R2 redesign)
     version: int = 1                # WHY: this capability's version (A6)
     status: Literal["draft", "approved"] = "draft"  # WHY: gates risky unattended replay (R4)
     target: Target
@@ -175,7 +195,3 @@ class ReplayResult(BaseModel):
     observed: str | None = None               # WHY: what was actually seen
     fallback_depths: dict[int, int] = {}      # WHY: per-step winning-candidate index = drift telemetry (§7, R7)
     evidence_dir: str                         # WHY: pointer to logs/screenshots/trace
-
-
-# resolve the forward ref used in OutputSpec.extract
-OutputSpec.model_rebuild()

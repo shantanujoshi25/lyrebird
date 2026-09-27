@@ -14,6 +14,21 @@
     "nearby_text": [
       "Member ID\t\tSearch",
       "Member ID"
+    ],
+    "locators": [
+      {
+        "kind": "css",
+        "value": "input[name=\"q\"]"
+      },
+      {
+        "kind": "role",
+        "value": "textbox",
+        "name": "q"
+      },
+      {
+        "kind": "nth",
+        "value": "input@0"
+      }
     ]
   },
   {
@@ -30,6 +45,21 @@
     "container_path": [],
     "nearby_text": [
       "Member ID\t\tSearch"
+    ],
+    "locators": [
+      {
+        "kind": "role",
+        "value": "button",
+        "name": "Search"
+      },
+      {
+        "kind": "text",
+        "value": "Search"
+      },
+      {
+        "kind": "nth",
+        "value": "button@0"
+      }
     ]
   }
 ]

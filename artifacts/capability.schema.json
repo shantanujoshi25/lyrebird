@@ -23,6 +23,29 @@
       "title": "ConditionDetector",
       "type": "object"
     },
+    "DurableLocator": {
+      "description": "An ordered set of concrete handles to ONE DOM node, captured from the node itself at\ndiscovery. Replay tries candidates in order; the first that resolves to exactly one element\nwins, and its index is the fallback depth (drift telemetry, \u00a77). Used for BOTH step targets\nand output values \u2014 one uniform locator, no per-purpose grammar.",
+      "properties": {
+        "semantic_id": {
+          "title": "Semantic Id",
+          "type": "string"
+        },
+        "candidates": {
+          "items": {
+            "$ref": "#/$defs/LocatorCandidate"
+          },
+          "minItems": 1,
+          "title": "Candidates",
+          "type": "array"
+        }
+      },
+      "required": [
+        "semantic_id",
+        "candidates"
+      ],
+      "title": "DurableLocator",
+      "type": "object"
+    },
     "InputParam": {
       "properties": {
         "name": {
@@ -114,63 +137,55 @@
     },
     "LocatorCandidate": {
       "properties": {
-        "strategy": {
-          "$ref": "#/$defs/LocatorStrategy"
+        "kind": {
+          "$ref": "#/$defs/LocatorKind"
         },
-        "args": {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "default": {},
-          "title": "Args",
-          "type": "object"
+        "value": {
+          "title": "Value",
+          "type": "string"
         },
-        "confidence": {
-          "maximum": 1,
-          "minimum": 0,
-          "title": "Confidence",
-          "type": "number"
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "frame": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Frame"
         }
       },
       "required": [
-        "strategy",
-        "confidence"
+        "kind",
+        "value"
       ],
       "title": "LocatorCandidate",
       "type": "object"
     },
-    "LocatorSpec": {
-      "properties": {
-        "semantic_id": {
-          "title": "Semantic Id",
-          "type": "string"
-        },
-        "candidates": {
-          "items": {
-            "$ref": "#/$defs/LocatorCandidate"
-          },
-          "minItems": 1,
-          "title": "Candidates",
-          "type": "array"
-        }
-      },
-      "required": [
-        "semantic_id",
-        "candidates"
-      ],
-      "title": "LocatorSpec",
-      "type": "object"
-    },
-    "LocatorStrategy": {
-      "description": "The A12 invariant lives here: every member must be answerable on web AND desktop-AX.\n\nCSS and XPath are deliberately ABSENT \u2014 they have no desktop-AX equivalent, so a\ncandidate using them would make the artifact web-only. Because this is an enum, any\nnon-member value (e.g. \"css\") fails Pydantic validation automatically \u2014 the surface-\nagnostic invariant is enforced structurally, not by a manual check.",
+    "LocatorKind": {
+      "description": "How to re-find an element. These are the durable handles the discovery pass reads\nSTRAIGHT OFF the DOM node the LLM pointed at \u2014 most-stable first. They map cleanly to both\nweb (Playwright) and desktop-AX, so an artifact isn't web-only:\n\n  css   -> a stable structural selector: #id, [name=], [data-*=] (NOT brittle class chains)\n  role  -> ARIA role + accessible name (Playwright get_by_role; AX has the same pair)\n  text  -> exact visible text (get_by_text; AX name match)\n  label -> a value cell anchored on its stable LABEL (\"the cell next to 'Savings'\") \u2014 the\n           only durable handle a bare value cell has, since its own text is the value and\n           changes per run. `value` holds the label text.\n  nth   -> tag + ordinal within the frame \u2014 last resort, only when nothing else is stable\n\nWe store several, ordered; replay tries them in order and the winning index is the drift\nsignal (\u00a77). We do NOT synthesize these from reconstructed text \u2014 they come from the real\nnode, which is why old back-office apps (stable DOM) replay reliably.",
       "enum": [
-        "role_name",
-        "visible_text",
-        "label_proximity",
-        "relative_anchor",
-        "bbox"
+        "css",
+        "role",
+        "text",
+        "label",
+        "nth"
       ],
-      "title": "LocatorStrategy",
+      "title": "LocatorKind",
       "type": "string"
     },
     "OutcomeClass": {
@@ -199,6 +214,7 @@
       "type": "string"
     },
     "OutputSpec": {
+      "description": "A declared output: replay resolves `locator` to the SAME DOM node the LLM read at\ndiscovery, reads its text/value, and casts to `type`. The locator is durable (captured off\nthe node), so the value can change per run but the recipe doesn't \u2014 the read stays stable.",
       "properties": {
         "name": {
           "title": "Name",
@@ -214,31 +230,26 @@
           "title": "Type",
           "type": "string"
         },
-        "extract": {
-          "$ref": "#/$defs/LocatorSpec"
-        },
-        "transform": {
+        "locator": {
           "anyOf": [
             {
-              "enum": [
-                "text",
-                "number",
-                "currency"
-              ],
-              "type": "string"
+              "$ref": "#/$defs/DurableLocator"
             },
             {
               "type": "null"
             }
           ],
-          "default": null,
-          "title": "Transform"
+          "default": null
+        },
+        "value_seen": {
+          "default": "",
+          "title": "Value Seen",
+          "type": "string"
         }
       },
       "required": [
         "name",
-        "type",
-        "extract"
+        "type"
       ],
       "title": "OutputSpec",
       "type": "object"
@@ -299,7 +310,7 @@
         "target": {
           "anyOf": [
             {
-              "$ref": "#/$defs/LocatorSpec"
+              "$ref": "#/$defs/DurableLocator"
             },
             {
               "type": "null"
@@ -462,6 +473,18 @@
     "description": {
       "title": "Description",
       "type": "string"
+    },
+    "goal": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Goal"
     },
     "version": {
       "default": 1,

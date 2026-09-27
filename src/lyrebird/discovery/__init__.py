@@ -10,8 +10,8 @@ pytest in C5 asserts the replay package has no import path to the LLM client.
     loop.py     the loop: observe -> decide -> policy check -> act, stop conditions, escalation
 """
 
-from lyrebird.discovery.loop import DiscoveryLoop, DiscoveryResult
 from lyrebird.discovery.llm import AnthropicClient, FakeLLMClient, LLMClient, ToolCall
+from lyrebird.discovery.loop import DiscoveryLoop, DiscoveryResult
 
 __all__ = [
     "AnthropicClient",

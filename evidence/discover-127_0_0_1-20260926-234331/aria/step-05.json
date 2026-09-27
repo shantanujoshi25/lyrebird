@@ -12,7 +12,7 @@
     ],
     "container_path": [],
     "nearby_text": [
-      "Member 100003\n\nOpen sub-account"
+      "Member 100001\n\nOpen sub-account"
     ],
     "locators": [
       {
@@ -42,27 +42,27 @@
       21
     ],
     "container_path": [
-      "frame:http://127.0.0.1:8000/workspace/member/100003"
+      "frame:http://127.0.0.1:8000/workspace/member/100001"
     ],
     "nearby_text": [
-      "Katherine Johnson\nChecking\t$0.00\nSavings\t$15,320.00\nRefresh balance"
+      "Ada Lovelace\nChecking\t$0.00\nSavings\t$4,210.75\nRefresh balance"
     ],
     "locators": [
       {
         "kind": "role",
         "value": "button",
         "name": "Refresh balance",
-        "frame": "http://127.0.0.1:8000/workspace/member/100003"
+        "frame": "http://127.0.0.1:8000/workspace/member/100001"
       },
       {
         "kind": "text",
         "value": "Refresh balance",
-        "frame": "http://127.0.0.1:8000/workspace/member/100003"
+        "frame": "http://127.0.0.1:8000/workspace/member/100001"
       },
       {
         "kind": "nth",
         "value": "button@0",
-        "frame": "http://127.0.0.1:8000/workspace/member/100003"
+        "frame": "http://127.0.0.1:8000/workspace/member/100001"
       }
     ]
   },
@@ -74,11 +74,11 @@
     "bbox": [
       92,
       154,
-      74,
+      66,
       20
     ],
     "container_path": [
-      "frame:http://127.0.0.1:8000/workspace/member/100003"
+      "frame:http://127.0.0.1:8000/workspace/member/100001"
     ],
     "nearby_text": [
       "Checking\t$0.00",
@@ -88,55 +88,55 @@
       {
         "kind": "label",
         "value": "Checking",
-        "frame": "http://127.0.0.1:8000/workspace/member/100003"
+        "frame": "http://127.0.0.1:8000/workspace/member/100001"
       },
       {
         "kind": "role",
         "value": "text",
         "name": "$0.00",
-        "frame": "http://127.0.0.1:8000/workspace/member/100003"
+        "frame": "http://127.0.0.1:8000/workspace/member/100001"
       },
       {
         "kind": "nth",
         "value": "td@2",
-        "frame": "http://127.0.0.1:8000/workspace/member/100003"
+        "frame": "http://127.0.0.1:8000/workspace/member/100001"
       }
     ]
   },
   {
     "index": 3,
     "role": "text",
-    "name": "$15,320.00",
-    "value": "$15,320.00",
+    "name": "$4,210.75",
+    "value": "$4,210.75",
     "bbox": [
       92,
       176,
-      74,
+      66,
       20
     ],
     "container_path": [
-      "frame:http://127.0.0.1:8000/workspace/member/100003"
+      "frame:http://127.0.0.1:8000/workspace/member/100001"
     ],
     "nearby_text": [
-      "Savings\t$15,320.00",
+      "Savings\t$4,210.75",
       "Savings"
     ],
     "locators": [
       {
         "kind": "label",
         "value": "Savings",
-        "frame": "http://127.0.0.1:8000/workspace/member/100003"
+        "frame": "http://127.0.0.1:8000/workspace/member/100001"
       },
       {
         "kind": "role",
         "value": "text",
-        "name": "$15,320.00",
-        "frame": "http://127.0.0.1:8000/workspace/member/100003"
+        "name": "$4,210.75",
+        "frame": "http://127.0.0.1:8000/workspace/member/100001"
       },
       {
         "kind": "nth",
         "value": "td@4",
-        "frame": "http://127.0.0.1:8000/workspace/member/100003"
+        "frame": "http://127.0.0.1:8000/workspace/member/100001"
       }
     ]
   }

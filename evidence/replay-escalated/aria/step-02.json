@@ -14,6 +14,21 @@
     "nearby_text": [
       "Initial deposit",
       "Initial deposit"
+    ],
+    "locators": [
+      {
+        "kind": "css",
+        "value": "input[name=\"amount\"]"
+      },
+      {
+        "kind": "role",
+        "value": "textbox",
+        "name": "250.00"
+      },
+      {
+        "kind": "nth",
+        "value": "input@0"
+      }
     ]
   },
   {
@@ -31,6 +46,21 @@
     "nearby_text": [
       "Account type\t\nSavings\nChecking\nMoney Market",
       "Account type"
+    ],
+    "locators": [
+      {
+        "kind": "css",
+        "value": "select[name=\"acct_type\"]"
+      },
+      {
+        "kind": "role",
+        "value": "combobox",
+        "name": "Money Market"
+      },
+      {
+        "kind": "nth",
+        "value": "select@0"
+      }
     ]
   },
   {
@@ -48,6 +78,21 @@
     "nearby_text": [
       "Statement delivery\t Paper  Electronic",
       "Statement delivery"
+    ],
+    "locators": [
+      {
+        "kind": "css",
+        "value": "input[name=\"statement\"]"
+      },
+      {
+        "kind": "role",
+        "value": "radio",
+        "name": "Paper"
+      },
+      {
+        "kind": "nth",
+        "value": "input@1"
+      }
     ]
   },
   {
@@ -65,6 +110,21 @@
     "nearby_text": [
       "Statement delivery\t Paper  Electronic",
       "Statement delivery"
+    ],
+    "locators": [
+      {
+        "kind": "css",
+        "value": "input[name=\"statement\"]"
+      },
+      {
+        "kind": "role",
+        "value": "radio",
+        "name": "Electronic"
+      },
+      {
+        "kind": "nth",
+        "value": "input@2"
+      }
     ]
   },
   {
@@ -82,6 +142,21 @@
     "nearby_text": [
       "Authorization\t Member authorized this action",
       "Authorization"
+    ],
+    "locators": [
+      {
+        "kind": "css",
+        "value": "input[name=\"authorized\"]"
+      },
+      {
+        "kind": "role",
+        "value": "checkbox",
+        "name": "Member authorized this action"
+      },
+      {
+        "kind": "nth",
+        "value": "input@3"
+      }
     ]
   },
   {
@@ -98,6 +173,21 @@
     "container_path": [],
     "nearby_text": [
       "Continue to review"
+    ],
+    "locators": [
+      {
+        "kind": "role",
+        "value": "button",
+        "name": "Continue to review"
+      },
+      {
+        "kind": "text",
+        "value": "Continue to review"
+      },
+      {
+        "kind": "nth",
+        "value": "button@0"
+      }
     ]
   }
 ]

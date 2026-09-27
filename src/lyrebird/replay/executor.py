@@ -15,28 +15,45 @@ caller-supplied values; sensitive params come from env, never the artifact.
 
 from __future__ import annotations
 
-import os
 import re
 import time
-from dataclasses import dataclass, field
-from typing import Callable
+from collections.abc import Callable
+from dataclasses import dataclass
 
 from lyrebird.capability.schema import (
-    Capability, ConditionDetector, KnownCondition, OutcomeClass, OutcomeCode, ReplayResult, Step,
+    Capability,
+    KnownCondition,
+    OutcomeClass,
+    OutcomeCode,
+    ReplayResult,
+    Risk,
+    Step,
 )
 from lyrebird.policy import Policy, check_action, classify_risk
-from lyrebird.capability.schema import Risk
 from lyrebird.replay.detector import detected
-from lyrebird.replay.resolver import ResolveError, resolve
-from lyrebird.surface.base import Action, Observation, Surface, Viewport
+from lyrebird.surface.base import Action, Observation, Surface
 
 # Recoverable-condition retry budget defaults (a step's KnownCondition.max_retries overrides).
 _BACKOFF_S = 0.2
 
+# Value-shape patterns for tag-agnostic anchor resolution (R2). A "currency"/"number" value is
+# matched wherever it appears near the recorded label; "text" grabs a short trailing token.
+def _coerce_by_type(raw_text: str, declared_type: str) -> object:
+    """Coerce the extracted string per the output's DECLARED type (from the artifact), not by
+    guessing the shape. number/integer -> pull the numeric part and float/int it; else the string.
+    The LLM already produced the right value; this only casts it to the caller's declared type."""
+    if declared_type in ("number", "integer"):
+        m = re.search(r"-?\d[\d,]*(?:\.\d+)?", raw_text)
+        if m:
+            num = float(m.group(0).replace(",", ""))
+            return int(num) if declared_type == "integer" else num
+    return raw_text.strip()
+
 
 @dataclass
 class ReplayContext:
-    params: dict[str, str]                 # per-invocation input values (member_id=...)
+    params: dict[str, str]                 # per-invocation NON-secret input values (member_id=...)
+    secrets: dict[str, str] | None = None  # sensitive input values, from the local secrets file (A7)
     confirm_risky: bool = False            # caller opt-in for risky steps on approved artifacts
     relogin: Callable[[], None] | None = None  # subflow to re-authenticate on SESSION_EXPIRED
     max_transient_retries: int = 2         # TRANSIENT/APP_ERROR budget before degrading to hard
@@ -44,14 +61,18 @@ class ReplayContext:
 
 class ReplayEngine:
     def __init__(self, cap: Capability, surface: Surface, policy: Policy, *, evidence_dir: str = "",
-                 controller: "object | None" = None, on_step: "Callable[[int, str], None] | None" = None) -> None:
+                 controller: object | None = None, on_step: Callable[[int, str], None] | None = None,
+                 deviation_handler: Callable | None = None) -> None:
         self.cap = cap
         self.surface = surface
         self.policy = policy
         self.evidence_dir = evidence_dir
         self.controller = controller  # optional SessionController: makes escalation a REAL handoff
         self.on_step = on_step        # optional evidence hook: (step_index, status) -> writes a snapshot
-        self._recorded_vp = cap.provenance.viewport
+        # optional R4 seam: on a genuine deviation, produce an LLM diagnostic (text only) + hand
+        # off to a human. Signature: (step, expected, observed, obs, text, fallback_depths) -> ReplayResult.
+        # Default None keeps replay fully deterministic (deviation -> structured FAILURE).
+        self._deviation_handler = deviation_handler
 
     def _emit_step(self, step_index: int, status: str) -> None:
         if self.on_step is not None:
@@ -74,9 +95,32 @@ class ReplayEngine:
                                         fallback_depths=fallback_depths)
 
             outcome = self._run_step(step, ctx, fallback_depths)
-            self._emit_step(step.index, outcome.status if outcome else "ok")
             if outcome is not None:
+                self._emit_step(step.index, outcome.status)
                 return outcome  # a business outcome or a hard failure short-circuits
+
+            # SUPERVISE (R3): if this step recorded a verified postcondition, confirm it holds —
+            # deterministically, NO LLM. If it doesn't, re-check known conditions; if still
+            # unexplained, this is a DEVIATION (R4 routes it to diagnostic + human handoff).
+            if step.postcondition is not None:
+                obs, text = self._perceive()
+                # substitute {{param}} in the expected text with this invocation's value, so a
+                # postcondition that references a bound input (e.g. the member id) checks the
+                # RIGHT value on replay rather than the discovery-time constant.
+                pc = step.postcondition.model_copy(update={"match": self._substitute(step.postcondition.match, ctx)})
+                if not detected(pc, obs, text):
+                    known = self._match_condition(obs, text)
+                    if known is not None:
+                        # a known condition explains it — handle via the taxonomy path
+                        dev = self._handle_condition(known, step, ctx, fallback_depths)
+                        if dev is not None:
+                            self._emit_step(step.index, dev.status)
+                            return dev
+                    else:
+                        self._emit_step(step.index, "DEVIATION")
+                        deviation = self._on_deviation(step, obs, text, fallback_depths)
+                        return deviation
+            self._emit_step(step.index, "ok")
 
         # 2. success checkpoint
         obs, text = self._perceive()
@@ -85,29 +129,25 @@ class ReplayEngine:
                                 expected=self.cap.success_checkpoint.match, observed="checkpoint not present",
                                 fallback_depths=fallback_depths)
 
-        # 3. extract declared outputs
-        outputs = self._extract_outputs(text)
+        # 3. extract declared outputs. A failed extraction self-check (the recipe returned a value
+        #    inconsistent with what the LLM saw at discovery) is a DEVIATION, not a silent bad value.
+        outputs, deviation = self._extract_outputs(obs, text)
+        if deviation is not None:
+            name, reason = deviation
+            last = self.cap.steps[-1] if self.cap.steps else None
+            if last is not None:
+                return self._on_deviation(last, obs, f"output {name}: {reason}", fallback_depths)
+            return self._result("FAILURE", outcome_code=OutcomeCode.CHECKPOINT_FAILED,
+                                expected=f"valid {name}", observed=reason, fallback_depths=fallback_depths)
         return self._result("SUCCESS", outputs=outputs, fallback_depths=fallback_depths)
 
     # ── per-step execution ────────────────────────────────────────────────
     def _run_step(self, step: Step, ctx: ReplayContext, fallback_depths: dict[int, int]) -> ReplayResult | None:
-        obs, _ = self._perceive()
-
-        # resolve target (if any) against the current observation
-        target_index: int | None = None
-        if step.target is not None:
-            try:
-                res = resolve(step.target, obs, recorded_viewport=self._recorded_vp, live_viewport=self.surface.viewport)
-            except ResolveError as exc:
-                return self._result("FAILURE", outcome_code=OutcomeCode.LOCATOR_NOT_FOUND,
-                                    failed_step=step.index, expected=step.target.semantic_id, observed=str(exc),
-                                    fallback_depths=fallback_depths)
-            target_index = res.index
-            fallback_depths[step.index] = res.fallback_depth
-
-        # policy check BEFORE acting (R4)
+        # policy check BEFORE acting (R4). For navigate, check the TARGET url (where we're
+        # going), not the current page — consistent with the discovery loop; otherwise a
+        # navigate to a disallowed domain would be judged against the (allowed) current page.
         action_type = step.action
-        url = self.surface.observe().url
+        url = step.value if (step.action == "navigate" and step.value) else self.surface.observe().url
         decision = check_action(self.policy, url=url, action_type=action_type)
         if not decision.allowed:
             return self._result("ESCALATED", outcome_code=None, failed_step=step.index,
@@ -117,12 +157,22 @@ class ReplayEngine:
         value = self._substitute(step.value, ctx)
 
         # act, with recoverable-condition handling around it
-        return self._act_with_recovery(step, target_index, value, ctx, fallback_depths)
+        return self._act_with_recovery(step, value, ctx, fallback_depths)
 
-    def _act_with_recovery(self, step, target_index, value, ctx, fallback_depths) -> ReplayResult | None:
+    def _act_with_recovery(self, step, value, ctx, fallback_depths) -> ReplayResult | None:
         attempts = 0
         while True:
-            self.surface.act(Action(kind=step.action, target_index=target_index, value=value))
+            # Resolve+act via the durable locator directly (no element index). The Surface tries
+            # the recorded candidates in order; the winning index is the drift signal. A target
+            # that resolves to nothing is a hard LOCATOR_NOT_FOUND.
+            if step.target is not None:
+                depth = self._act_locator(step, value, fallback_depths)
+                if depth < 0:
+                    return self._result("FAILURE", outcome_code=OutcomeCode.LOCATOR_NOT_FOUND,
+                                        failed_step=step.index, expected=step.target.semantic_id,
+                                        observed="no recorded locator resolved", fallback_depths=fallback_depths)
+            else:
+                self.surface.act(Action(kind=step.action, value=value))  # navigate / global press
             obs, text = self._perceive()
 
             hit = self._match_condition(obs, text)
@@ -156,19 +206,48 @@ class ReplayEngine:
                         return None  # overlay gone, underlying page clean -> step done
                     continue         # something else surfaced; loop will handle or exhaust
                 time.sleep(_BACKOFF_S * attempts if hit.on_detect == "retry_backoff" else 0)
-                if step.target is not None:  # re-resolve after a page change (indices shift)
-                    obs2, _ = self._perceive()
-                    try:
-                        res = resolve(step.target, obs2, recorded_viewport=self._recorded_vp, live_viewport=self.surface.viewport)
-                        target_index = res.index
-                        fallback_depths[step.index] = res.fallback_depth
-                    except ResolveError:
-                        pass
-                continue
+                continue  # loop re-resolves+re-acts the durable locator on the fresh page
 
             # hard
             return self._result("FAILURE", outcome_code=hit.code, failed_step=step.index,
                                 fallback_depths=fallback_depths)
+
+    def _act_locator(self, step: Step, value: str | None, fallback_depths: dict[int, int]) -> int:
+        """Resolve the step's durable locator and act on it. Returns the winning candidate depth
+        (drift signal), or -1 if nothing resolved. Records depth into fallback_depths."""
+        pw, depth = self.surface.resolve_locator(step.target)  # type: ignore[attr-defined]
+        if pw is None:
+            return -1
+        fallback_depths[step.index] = depth
+        self.surface.act_locator(step.action, step.target, value)
+        return depth
+
+    # ── supervision (R3): postcondition failed → classify or deviate ──────
+    def _handle_condition(self, cond: KnownCondition, step: Step, ctx: ReplayContext,
+                          fallback_depths: dict[int, int]) -> ReplayResult | None:
+        """A known condition explains a failed postcondition. Business/hard are terminal;
+        recoverable returns None so the run continues (the checkpoint/next step will catch it)."""
+        if cond.klass is OutcomeClass.BUSINESS_OUTCOME:
+            return self._result("BUSINESS_OUTCOME", outcome_code=cond.code, failed_step=step.index,
+                                fallback_depths=fallback_depths)
+        if cond.klass is OutcomeClass.HARD:
+            return self._result("FAILURE", outcome_code=cond.code, failed_step=step.index,
+                                fallback_depths=fallback_depths)
+        return None  # recoverable — let the flow continue
+
+    def _on_deviation(self, step: Step, obs: Observation, text: str,
+                      fallback_depths: dict[int, int]) -> ReplayResult:
+        """A step's verified postcondition failed and NO known condition explains it — a genuine
+        deviation. R3: return a structured FAILURE (deviation) with expected vs observed. R4
+        upgrades this to: generate an LLM diagnostic (text only) + hand off to a human + log for
+        offline artifact update. The deviation hook is a single seam (`self._deviation_handler`)."""
+        expected = step.postcondition.match if step.postcondition else ""
+        observed = (text or "")[:200]
+        if self._deviation_handler is not None:
+            return self._deviation_handler(step, expected, observed, obs, text, fallback_depths)
+        return self._result("FAILURE", outcome_code=OutcomeCode.CHECKPOINT_FAILED, failed_step=step.index,
+                            expected=expected, observed=f"deviation: postcondition not met (saw: {observed!r})",
+                            fallback_depths=fallback_depths)
 
     # ── condition handling ────────────────────────────────────────────────
     def _match_condition(self, obs: Observation, text: str) -> KnownCondition | None:
@@ -181,7 +260,7 @@ class ReplayEngine:
         if cond.on_detect == "dismiss":
             # find and click a dismiss control (button whose name implies dismissal)
             for e in obs.elements:
-                if e.role == "button" and re.search(r"dismiss|close|ok", e.name, re.I):
+                if e.role == "button" and re.search(r"dismiss|close|ok", e.name, re.IGNORECASE):
                     self.surface.act(Action(kind="click", target_index=e.index))
                     return True
             return False
@@ -195,28 +274,39 @@ class ReplayEngine:
         return False
 
     # ── outputs / perception / result ─────────────────────────────────────
-    def _extract_outputs(self, text: str) -> dict[str, object]:
+    def _extract_outputs(self, obs: Observation, text: str) -> tuple[dict[str, object], tuple[str, str] | None]:
+        """Read each declared output by RESOLVING its durable locator against the live page (the
+        Surface tries the recorded candidates in order — a stable label anchor first for a variable
+        value, so a different member's balance still resolves). Returns (outputs, deviation): a
+        deviation is (name, reason) when a locator resolves to nothing — routed to the handoff path.
+        The only per-type logic is casting the read TEXT to the output's declared type."""
         out: dict[str, object] = {}
         for spec in self.cap.outputs:
-            label = spec.extract.candidates[0].args.get("label", "")
-            # find "<label> ... $<number>" in the visible text
-            m = re.search(rf"{re.escape(label)}[^\d$]*\$?([\d,]+\.\d{{2}})", text)
-            if m:
-                raw = m.group(1).replace(",", "")
-                out[spec.name] = float(raw) if spec.transform in ("number", "currency") else raw
-        return out
+            if spec.locator is None:
+                continue
+            raw_text, _ = self.surface.read_locator(spec.locator)
+            if raw_text is None:
+                return out, (spec.name, f"output locator {spec.locator.semantic_id!r} did not resolve")
+            if not raw_text.strip():
+                return out, (spec.name, f"output {spec.name!r} resolved but was empty")
+            out[spec.name] = _coerce_by_type(raw_text, spec.type)
+        return out, None
+
+    def _param_value(self, name: str, ctx: ReplayContext) -> str:
+        param = next((p for p in self.cap.inputs if p.name == name), None)
+        if param and param.sensitive:  # secrets never come from the artifact/ctx.params (A7)
+            return (ctx.secrets or {}).get(name, "")
+        return ctx.params.get(name, "")
 
     def _substitute(self, value: str | None, ctx: ReplayContext) -> str | None:
         if not value:
             return value
+        # whole-string param (a step's typed value) -> exact value (preserves type/format)
         m = re.fullmatch(r"\{\{(\w+)\}\}", value)
-        if not m:
-            return value
-        name = m.group(1)
-        param = next((p for p in self.cap.inputs if p.name == name), None)
-        if param and param.sensitive:
-            return os.environ.get(f"LYREBIRD_PARAM_{name.upper()}", "")
-        return ctx.params.get(name, "")
+        if m:
+            return self._param_value(m.group(1), ctx)
+        # embedded params (e.g. a postcondition "Member {{member_id}}") -> substring replace
+        return re.sub(r"\{\{(\w+)\}\}", lambda mm: self._param_value(mm.group(1), ctx), value)
 
     def _escalate(self, step: int, reason: str) -> None:
         """If a SessionController is attached, turn this stop into a REAL handoff: write the

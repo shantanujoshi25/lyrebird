@@ -69,7 +69,48 @@ _COLLECT_JS = r"""
     if (cell && cell.previousElementSibling) out.push((cell.previousElementSibling.innerText || '').trim());
     return out.filter(Boolean);
   };
-  const els = Array.from(document.querySelectorAll(SEL));
+  // Durable locators, read straight off the node — most-stable first. These are concrete
+  // handles (a real id/name/attr, an ARIA role+name, exact text, or a tag ordinal), so replay
+  // re-finds THIS node deterministically. We deliberately avoid class chains (brittle).
+  const cssEscape = (s) => (window.CSS && CSS.escape) ? CSS.escape(s) : s.replace(/[^\w-]/g, '\\$&');
+  const locatorsFor = (el, role, name) => {
+    const locs = [];
+    const tag = el.tagName.toLowerCase();
+    // Surface the LABEL this cell COULD be anchored on (the previous cell's text). We don't
+    // decide whether to use it — the LLM does at read_value, based on whether the value varies.
+    if (tag === 'td' || tag === 'th') {
+      const prev = el.previousElementSibling;
+      const label = prev && (prev.innerText || '').trim();
+      if (label) locs.push({ kind: 'label', value: label.slice(0, 60) });
+    }
+    if (el.id) locs.push({ kind: 'css', value: '#' + cssEscape(el.id) });
+    const nm = el.getAttribute('name');
+    if (nm) locs.push({ kind: 'css', value: tag + '[name="' + nm + '"]' });
+    for (const a of el.attributes || []) {              // stable data-*/test hooks
+      if (/^data-(test|testid|qa|id|cy)/.test(a.name) && a.value) {
+        locs.push({ kind: 'css', value: tag + '[' + a.name + '="' + a.value + '"]' });
+      }
+    }
+    if (role && name) locs.push({ kind: 'role', value: role, name: name.slice(0, 80) });
+    if (name && (role === 'link' || role === 'button')) locs.push({ kind: 'text', value: name.slice(0, 80) });
+    // last resort: tag + ordinal among same-tag siblings across the doc (stable if DOM is stable)
+    const same = Array.from(document.getElementsByTagName(tag));
+    const ord = same.indexOf(el);
+    if (ord >= 0) locs.push({ kind: 'nth', value: tag + '@' + ord });
+    return locs;
+  };
+  // interactables (what the model acts on) PLUS value-bearing text cells (what the model
+  // READS). The latter are table cells holding a number/currency that aren't themselves
+  // interactable — so an output value like a balance becomes an addressable element the
+  // model can point at with read_value, and replay can re-resolve deterministically.
+  const MONEY = /\$?\d[\d,]*\.\d{2}\b/;
+  const interactables = Array.from(document.querySelectorAll(SEL));
+  const cells = Array.from(document.querySelectorAll('td,th')).filter((c) => {
+    if (c.querySelector(SEL)) return false;                     // skip cells that contain a control
+    const t = (c.innerText || '').trim();
+    return t && t.length <= 40 && MONEY.test(t);                // short, value-bearing text
+  });
+  const els = interactables.concat(cells);
   const results = [];
   let i = 0;
   for (const el of els) {
@@ -78,14 +119,19 @@ _COLLECT_JS = r"""
     const style = getComputedStyle(el);
     if (style.display === 'none' || style.visibility === 'hidden') continue;
     el.setAttribute('data-lb-idx', String(i));                  // stable handle for act()
-    const role = roleFor(el);
+    const isCell = (el.tagName === 'TD' || el.tagName === 'TH') && !el.querySelector(SEL);
+    const role = isCell ? 'text' : roleFor(el);
+    const value = isCell ? (el.innerText || '').trim()
+                         : (('value' in el) ? String(el.value ?? '') : null);
+    const nm = isCell ? (el.innerText || '').trim().slice(0, 120) : nameFor(el, role);
     results.push({
       role,
-      name: nameFor(el, role),
-      value: ('value' in el) ? String(el.value ?? '') : null,
-      checked: ('checked' in el) ? !!el.checked : null,
+      name: nm,
+      value,
+      checked: (!isCell && 'checked' in el) ? !!el.checked : null,
       box: [Math.round(r.x + base.x), Math.round(r.y + base.y), Math.round(r.width), Math.round(r.height)],
       nearby: nearby(el),
+      locators: locatorsFor(el, role, nm),
       lb_idx: i,
     });
     i++;
@@ -106,7 +152,19 @@ class PlaywrightWebSurface:
         self._viewport = Viewport(width=width, height=height, device_scale_factor=1.0)
         # (frame, local_index) for every element in the last observe(), keyed by global index.
         self._index: list[tuple[Frame, int]] = []
-        self._page.goto(start_url, wait_until="networkidle")
+        self._goto(start_url)
+
+    def _goto(self, url: str) -> None:
+        """Navigate robustly. `domcontentloaded` fires reliably even on chatty real sites
+        (analytics/carousels keep the network busy so `networkidle` may never fire within the
+        timeout); then we settle on network-idle BEST-EFFORT with a short cap. This avoids the
+        hard 30s hang a strict `networkidle` goto causes on busy sites — a general fix, no
+        per-site config."""
+        self._page.goto(url, wait_until="domcontentloaded")
+        try:
+            self._page.wait_for_load_state("networkidle", timeout=4000)
+        except Exception:
+            pass
 
     # ── perceive ──────────────────────────────────────────────────────────
     def observe(self) -> Observation:
@@ -121,7 +179,9 @@ class PlaywrightWebSurface:
                 raw = frame.evaluate(_COLLECT_JS, base)
             except Exception:
                 continue  # a frame may be mid-navigation; skip it this pass
-            container = [] if frame == self._page.main_frame else [f"frame:{frame.name or frame.url}"]
+            is_main = frame == self._page.main_frame
+            frame_id = None if is_main else (frame.name or frame.url)
+            container = [] if is_main else [f"frame:{frame_id}"]
             for item in raw:
                 gi = len(elements)
                 name = item["name"]
@@ -129,6 +189,10 @@ class PlaywrightWebSurface:
                 # (false) .checked property in JS, so gate on the role, not on presence.
                 if item["role"] in ("checkbox", "radio") and item.get("checked") is not None:
                     name = f"{name} ({'checked' if item['checked'] else 'unchecked'})".strip()
+                locators = item.get("locators") or []
+                if frame_id:  # stamp the frame on each candidate so replay resolves in the right frame
+                    for loc in locators:
+                        loc["frame"] = frame_id
                 elements.append(
                     Element(
                         index=gi,
@@ -138,6 +202,7 @@ class PlaywrightWebSurface:
                         bbox=tuple(item["box"]),  # type: ignore[arg-type]
                         container_path=container,
                         nearby_text=item["nearby"],
+                        locators=locators,
                     )
                 )
                 self._index.append((frame, item["lb_idx"]))
@@ -165,7 +230,7 @@ class PlaywrightWebSurface:
     def act(self, action: Action) -> ActionResult:
         try:
             if action.kind == "navigate":
-                self._page.goto(action.value or "", wait_until="networkidle")
+                self._goto(action.value or "")
                 return ActionResult(ok=True, settled=True)
             if action.kind == "press":
                 self._page.keyboard.press(action.value or "Enter")
@@ -204,6 +269,106 @@ class PlaywrightWebSurface:
         except Exception:
             pass  # not every action triggers navigation; a timeout here is fine
 
+    # ── durable-locator resolution (replay) ────────────────────────────────
+    def _frame_for(self, frame_id: str | None) -> Frame:
+        """Find the frame a locator lives in. `frame_id` is either a frame name/exact URL, or a
+        STABLE SUBSTRING of the URL (the LLM's frame_anchor) — so a per-run iframe like
+        .../workspace/member/100003 is matched by 'workspace/member'. Exact match wins; else the
+        first frame whose name/url contains the anchor; else the main frame."""
+        if not frame_id:
+            return self._page.main_frame
+        for f in self._page.frames:
+            if f.name == frame_id or f.url == frame_id:
+                return f
+        for f in self._page.frames:
+            if frame_id in (f.url or "") or frame_id in (f.name or ""):
+                return f
+        return self._page.main_frame  # frame gone/renamed -> fall back to main (resolution may still fail cleanly)
+
+    def _candidate_locator(self, frame: Frame, cand: dict):
+        """A Playwright Locator for one durable candidate, or None if the kind is unusable."""
+        kind = cand.get("kind")
+        val = cand.get("value") or ""
+        if kind == "css":
+            return frame.locator(val)
+        if kind == "role":
+            name = cand.get("name")
+            return frame.get_by_role(val, name=name) if name else frame.get_by_role(val)  # type: ignore[arg-type]
+        if kind == "text":
+            return frame.get_by_text(val, exact=True)
+        if kind == "label":
+            # the value cell anchored on a stable label: the cell immediately AFTER the cell
+            # whose exact text is `val`, within the same row. Tag-agnostic via CSS adjacency
+            # on the row's cells; falls back to any element following the label's cell.
+            row = frame.locator("tr", has=frame.get_by_role("cell", name=val, exact=True))
+            if row.count() >= 1:
+                cells = row.first.get_by_role("cell")
+                n = cells.count()
+                for i in range(n):  # find the label cell, return the next one
+                    if (cells.nth(i).inner_text() or "").strip() == val and i + 1 < n:
+                        return cells.nth(i + 1)
+            return None
+        if kind == "nth":
+            tag, _, ord_s = val.partition("@")
+            try:
+                return frame.locator(tag).nth(int(ord_s))
+            except ValueError:
+                return None
+        return None
+
+    def resolve_locator(self, locator: object) -> tuple[object | None, int]:
+        """Resolve a DurableLocator to a unique Playwright Locator. Returns (locator, depth):
+        the first candidate that resolves to exactly one visible element wins; `depth` is its
+        index (0 = primary still works; higher = drift). (None, -1) if nothing resolves."""
+        candidates = getattr(locator, "candidates", []) or []
+        for depth, cand in enumerate(candidates):
+            c = cand.model_dump() if hasattr(cand, "model_dump") else dict(cand)
+            frame = self._frame_for(c.get("frame"))
+            pw = self._candidate_locator(frame, c)
+            if pw is None:
+                continue
+            try:
+                if pw.count() == 1:
+                    return pw, depth
+            except Exception:
+                continue
+        return None, -1
+
+    def read_locator(self, locator: object) -> tuple[str | None, int]:
+        """Resolve `locator` and read its display text (input value if it's a field). Returns
+        (text, depth) or (None, -1) if unresolved."""
+        pw, depth = self.resolve_locator(locator)
+        if pw is None:
+            return None, -1
+        try:
+            tag = (pw.evaluate("e => e.tagName.toLowerCase()") or "")
+            if tag in ("input", "textarea", "select"):
+                return (pw.input_value() or "").strip(), depth
+            return (pw.inner_text() or "").strip(), depth
+        except Exception:
+            return None, depth
+
+    def act_locator(self, kind: str, locator: object, value: str | None) -> ActionResult:
+        """Perform an action against a DurableLocator (the replay act path — no element index)."""
+        pw, _ = self.resolve_locator(locator)
+        if pw is None:
+            return ActionResult(ok=False, error="LOCATOR_NOT_FOUND", settled=True)
+        try:
+            if kind == "click":
+                pw.click()
+            elif kind == "type":
+                pw.fill(value or "")
+            elif kind == "select":
+                pw.select_option(value or "")
+            elif kind == "scroll":
+                pw.scroll_into_view_if_needed()
+            else:
+                return ActionResult(ok=False, error=f"unknown action kind {kind}", settled=True)
+            self._settle()
+            return ActionResult(ok=True, settled=True)
+        except Exception as exc:
+            return ActionResult(ok=False, error=f"{type(exc).__name__}: {exc}", settled=False)
+
     def page_text(self) -> str:
         """Visible innerText across the main frame and every iframe, joined.
 
@@ -236,7 +401,7 @@ class PlaywrightWebSurface:
         self._browser.close()
         self._pw.stop()
 
-    def __enter__(self) -> "PlaywrightWebSurface":
+    def __enter__(self) -> PlaywrightWebSurface:
         return self
 
     def __exit__(self, *exc: object) -> None:

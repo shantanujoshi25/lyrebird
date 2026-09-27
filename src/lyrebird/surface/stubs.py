@@ -41,6 +41,15 @@ class DesktopSurface:
     def page_text(self) -> str:
         raise NotImplementedError(_MSG)
 
+    def resolve_locator(self, locator: object) -> tuple[object | None, int]:
+        raise NotImplementedError(_MSG)
+
+    def read_locator(self, locator: object) -> tuple[str | None, int]:
+        raise NotImplementedError(_MSG)
+
+    def act_locator(self, kind: str, locator: object, value: str | None) -> ActionResult:
+        raise NotImplementedError(_MSG)
+
     def snapshot(self, dir: Path) -> None:
         raise NotImplementedError(_MSG)
 
@@ -66,6 +75,15 @@ class LegacyWebSurface:
         raise NotImplementedError(_MSG)
 
     def page_text(self) -> str:
+        raise NotImplementedError(_MSG)
+
+    def resolve_locator(self, locator: object) -> tuple[object | None, int]:
+        raise NotImplementedError(_MSG)
+
+    def read_locator(self, locator: object) -> tuple[str | None, int]:
+        raise NotImplementedError(_MSG)
+
+    def act_locator(self, kind: str, locator: object, value: str | None) -> ActionResult:
         raise NotImplementedError(_MSG)
 
     def snapshot(self, dir: Path) -> None:

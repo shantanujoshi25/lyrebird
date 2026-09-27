@@ -37,7 +37,7 @@ class Policy(BaseModel):
     redaction: RedactionRules = Field(default_factory=RedactionRules)
 
     @classmethod
-    def load(cls, path: Path | str) -> "Policy":
+    def load(cls, path: Path | str) -> Policy:
         path = Path(path)
         if not path.exists():
             # fail-closed: a missing policy is an error, not an implicit allow-all

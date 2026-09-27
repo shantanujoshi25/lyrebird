@@ -14,6 +14,21 @@
     "nearby_text": [
       "Username",
       "Username"
+    ],
+    "locators": [
+      {
+        "kind": "css",
+        "value": "input[name=\"u\"]"
+      },
+      {
+        "kind": "role",
+        "value": "textbox",
+        "name": "teller"
+      },
+      {
+        "kind": "nth",
+        "value": "input@0"
+      }
     ]
   },
   {
@@ -31,6 +46,21 @@
     "nearby_text": [
       "Password",
       "Password"
+    ],
+    "locators": [
+      {
+        "kind": "css",
+        "value": "input[name=\"p\"]"
+      },
+      {
+        "kind": "role",
+        "value": "textbox",
+        "name": "[REDACTED]"
+      },
+      {
+        "kind": "nth",
+        "value": "input@1"
+      }
     ]
   },
   {
@@ -47,6 +77,21 @@
     "container_path": [],
     "nearby_text": [
       "Sign in"
+    ],
+    "locators": [
+      {
+        "kind": "role",
+        "value": "button",
+        "name": "Sign in"
+      },
+      {
+        "kind": "text",
+        "value": "Sign in"
+      },
+      {
+        "kind": "nth",
+        "value": "button@0"
+      }
     ]
   }
 ]

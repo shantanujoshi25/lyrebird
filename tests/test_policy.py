@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from lyrebird.policy import Policy, check_action, classify_risk
-from lyrebird.capability.schema import LocatorCandidate, LocatorSpec, Risk, Step
+from lyrebird.capability.schema import DurableLocator, LocatorCandidate, Risk, Step
 
 POLICY_YAML = Path(__file__).resolve().parents[1] / "policy.yaml"
 
@@ -56,9 +56,9 @@ def _button_step(name: str) -> Step:
     return Step(
         index=0,
         action="click",
-        target=LocatorSpec(
+        target=DurableLocator(
             semantic_id="btn",
-            candidates=[LocatorCandidate(strategy="role_name", args={"role": "button", "name": name}, confidence=0.9)],
+            candidates=[LocatorCandidate(kind="role", value="button", name=name)],
         ),
     )
 

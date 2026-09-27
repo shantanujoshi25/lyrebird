@@ -6,14 +6,15 @@ half (replay). Schema design is a focal point of the evaluation (R2) — every f
 its place; see docs/01_ARCHITECTURE.md §4.
 """
 
+from lyrebird.capability.jsonschema_export import export_schema
 from lyrebird.capability.schema import (
     Capability,
     ConditionDetector,
+    DurableLocator,
     InputParam,
     KnownCondition,
     LocatorCandidate,
-    LocatorSpec,
-    LocatorStrategy,
+    LocatorKind,
     OutcomeClass,
     OutcomeCode,
     OutputSpec,
@@ -24,18 +25,17 @@ from lyrebird.capability.schema import (
     Target,
     Viewport,
 )
-from lyrebird.capability.jsonschema_export import export_schema
 from lyrebird.capability.store import CapabilityStore
 
 __all__ = [
     "Capability",
     "CapabilityStore",
     "ConditionDetector",
+    "DurableLocator",
     "InputParam",
     "KnownCondition",
     "LocatorCandidate",
-    "LocatorSpec",
-    "LocatorStrategy",
+    "LocatorKind",
     "OutcomeClass",
     "OutcomeCode",
     "OutputSpec",

@@ -8,6 +8,5 @@ See docs/01_ARCHITECTURE.md §7.
 """
 
 from lyrebird.replay.executor import ReplayEngine
-from lyrebird.replay.resolver import ResolveError, resolve
 
-__all__ = ["ReplayEngine", "ResolveError", "resolve"]
+__all__ = ["ReplayEngine"]

@@ -1,5 +1,6 @@
 # Secrets — never commit
 .env
+secrets.yaml
 
 # Python
 __pycache__/
@@ -21,6 +22,5 @@ evidence/*/
 # Operating-rules file — local only, not part of the repo deliverable
 CLAUDE.md
 
-# Design docs and the report are kept local-only (user request)
+# Phase/design docs are kept local-only; REPORT.md ships (a required deliverable).
 docs/
-REPORT.md

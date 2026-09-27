@@ -17,7 +17,6 @@ def test_importing_replay_does_not_load_anthropic() -> None:
         "import importlib, sys\n"
         "importlib.import_module('lyrebird.replay')\n"
         "importlib.import_module('lyrebird.replay.executor')\n"
-        "importlib.import_module('lyrebird.replay.resolver')\n"
         "importlib.import_module('lyrebird.replay.detector')\n"
         # the LLM client module must not have been pulled in transitively
         "assert 'anthropic' not in sys.modules, 'anthropic SDK loaded by replay!'\n"

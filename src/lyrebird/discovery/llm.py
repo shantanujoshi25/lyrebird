@@ -88,7 +88,7 @@ class FakeLLMClient:
     def decide(self, *, system: str, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> ToolCall:
         self.calls_seen.append({"messages": len(messages), "tools": [t["name"] for t in tools]})
         if self._i >= len(self.script):
-            return ToolCall(id=f"auto-finish", name="finish", input={"success": False, "reason": "script exhausted"})
+            return ToolCall(id="auto-finish", name="finish", input={"success": False, "reason": "script exhausted"})
         call = self.script[self._i]
         self._i += 1
         return call

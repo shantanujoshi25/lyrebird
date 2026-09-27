@@ -1,9 +1,10 @@
 """record_capability — trajectory + ARIA snapshots -> Capability.
 
-For each acting step, the recorded element (looked up by index in that step's ARIA snapshot)
-is turned into an ordered list of locator candidates, most-robust first. Candidate order is
-the fallback order at replay and the drift signal (§7). Only strategies with usable args are
-emitted, and never CSS/XPath (enforced anyway by the schema's LocatorStrategy enum, A12).
+Each acting step's target and each read output become a DurableLocator: an ordered set of
+concrete handles captured OFF the DOM node at discovery (id/name/data-*, role+name, exact text,
+label anchor, tag-ordinal), most-stable first. Replay tries them in order; the winning index is
+the drift signal (§7). We do not synthesize locators from reconstructed text — the node reported
+its own handles, so a stable-DOM legacy app replays reliably.
 
 The raw model transcript is NOT read or copied here — only the structured trajectory and the
 element snapshots — so the artifact is decoupled from the transcript by construction (R2).
@@ -18,18 +19,15 @@ from typing import Any
 from lyrebird.capability.schema import (
     Capability,
     ConditionDetector,
+    DurableLocator,
     InputParam,
     KnownCondition,
     LocatorCandidate,
-    LocatorSpec,
-    OutcomeClass,
-    OutcomeCode,
     OutputSpec,
     Provenance,
     Risk,
     Step,
     Target,
-    Viewport,
 )
 from lyrebird.recorder.binding import bind_value
 
@@ -37,36 +35,15 @@ from lyrebird.recorder.binding import bind_value
 _TARGETED = {"type", "click", "select", "scroll"}
 
 
-def _candidates_for(el: dict[str, Any], *, semantic_id: str) -> LocatorSpec:
-    """Ordered, most-robust-first locator candidates synthesized from a recorded element."""
-    role = el.get("role", "")
-    name = (el.get("name") or "").strip()
-    nearby = [t for t in el.get("nearby_text", []) if t]
-    bbox = el.get("bbox")
+def _durable_from(candidates: list[dict[str, Any]], *, semantic_id: str) -> DurableLocator | None:
+    """Wrap the node's own durable-locator dicts into a DurableLocator (skip malformed ones)."""
+    cands = [LocatorCandidate(**c) for c in candidates if c.get("kind") and c.get("value")]
+    return DurableLocator(semantic_id=semantic_id, candidates=cands) if cands else None
 
-    cands: list[LocatorCandidate] = []
-    # 1. role + accessible name — most robust, works across surfaces (AXRole+AXTitle).
-    if role and name:
-        cands.append(LocatorCandidate(strategy="role_name", args={"role": role, "name": name}, confidence=0.95))
-    # 2. visible text — for links/buttons whose text is the name.
-    if name and role in ("link", "button"):
-        cands.append(LocatorCandidate(strategy="visible_text", args={"text": name}, confidence=0.8))
-    # 3. label proximity — the adjacency-only labels of the hostile form.
-    if nearby:
-        cands.append(LocatorCandidate(strategy="label_proximity", args={"label": nearby[0], "role": role}, confidence=0.7))
-    # 4. relative anchor — "the control in the row whose label cell says X".
-    if len(nearby) > 1:
-        cands.append(
-            LocatorCandidate(strategy="relative_anchor", args={"anchor": nearby[-1], "relation": "same_row", "role": role}, confidence=0.5)
-        )
-    # 5. bbox — last resort; only usable when the replay viewport matches provenance (A14).
-    if bbox:
-        x, y, w, h = bbox
-        cands.append(LocatorCandidate(strategy="bbox", args={"x": str(x), "y": str(y), "w": str(w), "h": str(h)}, confidence=0.2))
 
-    if not cands:  # degenerate element — still need one candidate; bbox or a name-only guess
-        cands.append(LocatorCandidate(strategy="role_name", args={"role": role or "generic", "name": name}, confidence=0.1))
-    return LocatorSpec(semantic_id=semantic_id, candidates=cands)
+def _target_for(el: dict[str, Any], *, semantic_id: str) -> DurableLocator | None:
+    """The step target's durable locator, straight from the recorded element's own handles."""
+    return _durable_from(el.get("locators") or [], semantic_id=semantic_id)
 
 
 def _semantic_id(el: dict[str, Any], step_index: int) -> str:
@@ -89,26 +66,60 @@ def record_capability(
     success_checkpoint: ConditionDetector,
     target: Target,
     provenance: Provenance,
+    goal: str | None = None,
 ) -> Capability:
     trajectory_path, aria_dir = Path(trajectory_path), Path(aria_dir)
     rows = [json.loads(line) for line in trajectory_path.read_text().splitlines() if line.strip()]
 
     steps: list[Step] = []
+    output_locators: dict[str, DurableLocator] = {}   # output -> durable locator (LLM's variable/anchor judgment)
+    output_values: dict[str, str] = {}                # output -> value_seen (ground-truth sanity-check)
     for row in rows:
         tool = row["tool"]
+
+        # read_value rows are NOT steps — they carry the durable locator (and the LLM's
+        # variable/fixed + anchor judgment) for a declared output's value. Replay resolves it.
+        if tool == "read_value":
+            read = row.get("output_read") or {}
+            name = read.get("output")
+            if not name:
+                continue
+            loc = _durable_from(read.get("candidates") or [], semantic_id=f"{name}_value")
+            if loc:
+                output_locators[name] = loc
+            output_values[name] = read.get("value_seen", "")
+            continue
+
         idx = row.get("input", {}).get("index")
-        target_spec: LocatorSpec | None = None
+        target_spec: DurableLocator | None = None
         value: str | None = None
 
-        if tool in _TARGETED and idx is not None:
+        # A human-taught step (R4) carries its element inline (no ARIA file); build the same
+        # durable locator from it as for an LLM step.
+        human_el = row.get("human_element")
+        if tool in _TARGETED and human_el is not None:
+            target_spec = _target_for(human_el, semantic_id=_semantic_id(human_el, row["step"]))
+        elif tool in _TARGETED and idx is not None:
             el = _element_from_aria(aria_dir, row["step"], idx)
-            target_spec = _candidates_for(el, semantic_id=_semantic_id(el, row["step"]))
+            target_spec = _target_for(el, semantic_id=_semantic_id(el, row["step"]))
 
         if tool == "type":
             b = bind_value(explicit_binding=row.get("binding"), literal=row.get("input", {}).get("value"), inputs=inputs)
             value = b.value if b else None
         elif tool == "select":
             value = row.get("input", {}).get("value")
+
+        # verified postcondition (R2): the text the model expected and we confirmed post-action,
+        # recorded so replay can supervise this step deterministically. If the expected text
+        # contains a bound input's example value (e.g. the member id it saw), PARAMETERIZE it —
+        # otherwise the postcondition would wrongly hard-code one invocation's value and fail on
+        # replay with a different parameter.
+        expected = row.get("expected_text")
+        if expected:
+            for p in inputs:
+                if p.example and not p.sensitive and p.example in expected:
+                    expected = expected.replace(p.example, f"{{{{{p.name}}}}}")
+        postcondition = ConditionDetector(by="text", match=expected) if expected else None
 
         risk = _risk_for(row)
         steps.append(
@@ -117,16 +128,28 @@ def record_capability(
                 action=tool,  # type: ignore[arg-type]
                 target=target_spec,
                 value=value,
-                postcondition=None,
+                postcondition=postcondition,
                 risk=risk,
-                provenance="model",
+                provenance=row.get("provenance", "model"),  # human-taught steps carry provenance:human (R4)
             )
         )
+
+    # Attach the durable locator + observed value to each declared output that was read.
+    def _apply(o: OutputSpec) -> OutputSpec:
+        updates: dict[str, Any] = {}
+        if o.name in output_locators:
+            updates["locator"] = output_locators[o.name]
+        if o.name in output_values:
+            updates["value_seen"] = output_values[o.name]
+        return o.model_copy(update=updates) if updates else o
+
+    outputs = [_apply(o) for o in outputs]
 
     return Capability(
         capability_id=capability_id,
         name=name,
         description=description,
+        goal=goal,
         target=target,
         inputs=inputs,
         outputs=outputs,

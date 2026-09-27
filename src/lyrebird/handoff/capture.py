@@ -20,18 +20,41 @@ from typing import Any
 
 from lyrebird.policy import Policy, redact_text
 
+# Captures each human action as a FULL element descriptor (role/name/value/bbox/nearby_text) —
+# the same shape the observe() collector produces — so the recorder can build semantic locator
+# candidates for a human-taught step exactly as it does for an LLM step (R4). No fragile
+# post-hoc correlation: the human's move arrives replay-ready.
 _INIT_SCRIPT = r"""
 () => {
   if (window.__lyrebird_installed) return;
   window.__lyrebird_installed = true;
-  const send = (type, target) => {
+  const roleFor = (el) => {
+    const r = el.getAttribute && el.getAttribute('role'); if (r) return r;
+    const tag = (el.tagName || '').toLowerCase();
+    if (tag === 'a') return 'link';
+    if (tag === 'button') return 'button';
+    if (tag === 'select') return 'combobox';
+    if (tag === 'textarea') return 'textbox';
+    if (tag === 'input') { const t=(el.getAttribute('type')||'text').toLowerCase();
+      if (t==='checkbox') return 'checkbox'; if (t==='radio') return 'radio';
+      if (t==='submit'||t==='button') return 'button'; return 'textbox'; }
+    return tag;
+  };
+  const nameFor = (el) => (el.getAttribute && el.getAttribute('aria-label'))
+     || (el.innerText || el.value || (el.getAttribute && el.getAttribute('name')) || '').trim().slice(0,120);
+  const nearby = (el) => { const out=[]; const cell=el.closest&&el.closest('td'); const row=el.closest&&el.closest('tr');
+     if (row) out.push((row.innerText||'').trim().slice(0,120));
+     if (cell && cell.previousElementSibling) out.push((cell.previousElementSibling.innerText||'').trim());
+     return out.filter(Boolean); };
+  const send = (type, el) => {
     try {
+      const r = el.getBoundingClientRect ? el.getBoundingClientRect() : {x:0,y:0,width:0,height:0};
+      const role = roleFor(el);
       window.__lyrebird_capture({
-        type,
-        role: target.getAttribute ? (target.getAttribute('role') || target.tagName) : '',
-        name: (target.getAttribute && target.getAttribute('name')) || (target.innerText || '').slice(0, 60),
-        value: ('value' in target) ? String(target.value || '') : '',
-        url: location.href,
+        type, action: (type === 'change' && role !== 'combobox') ? 'type' : (type === 'change' ? 'select' : 'click'),
+        role, name: nameFor(el), value: ('value' in el) ? String(el.value || '') : '',
+        bbox: [Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height)],
+        nearby_text: nearby(el), url: location.href,
       });
     } catch (e) {}
   };
@@ -90,3 +113,31 @@ class HumanCapture:
         if not self._path.exists():
             return []
         return [json.loads(line) for line in self._path.read_text().splitlines() if line.strip()]
+
+
+def captured_actions_to_trajectory_rows(actions: list[dict[str, Any]], *, start_step: int) -> list[dict[str, Any]]:
+    """Turn captured human moves into recorder-ready trajectory rows (R4).
+
+    Each human action already carries a full element descriptor (role/name/value/bbox/
+    nearby_text), so we emit a trajectory row the recorder consumes exactly like an LLM step —
+    stamped provenance:human. The recorder builds the same semantic locator candidates, so the
+    human-taught step replays deterministically later.
+    """
+    rows: list[dict[str, Any]] = []
+    for i, a in enumerate(actions):
+        action = a.get("action") or ("click" if a.get("type") == "click" else "type")
+        el = {"index": i, "role": a.get("role", ""), "name": a.get("name", ""),
+              "value": a.get("value", ""), "bbox": a.get("bbox", [0, 0, 0, 0]),
+              "container_path": [], "nearby_text": a.get("nearby_text", [])}
+        rows.append({
+            "step": start_step + i,
+            "tool": action,
+            "input": {"index": i},
+            "binding": None,
+            "url": a.get("url", ""),
+            "ok": True,
+            "note": "human-taught",
+            "provenance": "human",
+            "human_element": el,   # the recorder reads this for human steps (no ARIA file needed)
+        })
+    return rows

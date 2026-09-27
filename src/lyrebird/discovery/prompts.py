@@ -21,9 +21,16 @@ acting again. Indices are only valid for the most recent observation.
 set to the parameter name (NOT a literal value). This keeps the recorded flow reusable and \
 avoids persisting real values.
 - Stay within the application. Do not attempt actions outside the goal.
-- When the goal is achieved, call `finish` with success=true and the observed value for \
-each declared output. If you get stuck or reach a dead end, call `finish` with success=false \
-and a brief reason.
+- Before finishing, call `read_value` once for EACH declared output, pointing (by element \
+`index`) at the element that shows the value. YOU judge whether the value is VARIABLE (changes \
+when the inputs change — a balance, a total, a name that depends on the member/product) or \
+FIXED. For a variable value you MUST give `anchor_label`: a stable nearby label the value sits \
+next to (e.g. 'Savings', 'Balance'), so replay re-finds it by that label even when the value \
+itself differs. Never rely on the value's own text for a variable value. This is what lets \
+deterministic replay (no LLM) re-read the value on a future run — do not skip it.
+- When the goal is achieved and every output has been read, call `finish` with success=true \
+and the observed value for each declared output. If you get stuck or reach a dead end, call \
+`finish` with success=false and a brief reason.
 Be efficient: prefer the shortest correct path."""
 
 

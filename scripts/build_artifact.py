@@ -10,15 +10,24 @@ from __future__ import annotations
 from pathlib import Path
 
 from lyrebird.capability.schema import (
-    ConditionDetector, InputParam, KnownCondition, LocatorCandidate, LocatorSpec,
-    OutcomeClass, OutcomeCode, OutputSpec, Provenance, Target, Viewport,
+    ConditionDetector,
+    InputParam,
+    KnownCondition,
+    OutcomeClass,
+    OutcomeCode,
+    OutputSpec,
+    Provenance,
+    Target,
+    Viewport,
 )
 from lyrebird.capability.store import CapabilityStore
 from lyrebird.recorder import record_capability
 
 ROOT = Path(__file__).resolve().parents[1]
-EVIDENCE = next((ROOT / "evidence").glob("discover-lookup-*"))
-TRAJ = ROOT / "tests" / "fixtures" / "discovery_trajectory.jsonl"
+# Source from the latest committed mock discovery run (127.0.0.1 = the local mock app), which
+# carries the verify-loop postconditions + the tag-agnostic output anchor (redesign R2).
+EVIDENCE = sorted((ROOT / "evidence").glob("discover-127_0_0_1-*"))[-1]
+TRAJ = EVIDENCE / "steps.jsonl"
 
 
 def main() -> None:
@@ -28,20 +37,15 @@ def main() -> None:
         capability_id="lookup_savings_balance",
         name="Look up member savings balance",
         description="Sign in, search a member by ID, and read the savings balance.",
+        goal="Sign in, look up member 100001, and read their savings balance.",
         inputs=[
             InputParam(name="username", type="string", example="teller"),
             InputParam(name="password", type="string", sensitive=True),
             InputParam(name="member_id", type="string", example="100001"),
         ],
-        outputs=[
-            OutputSpec(
-                name="savings_balance", type="number", transform="currency",
-                extract=LocatorSpec(
-                    semantic_id="savings_balance_cell",
-                    candidates=[LocatorCandidate(strategy="label_proximity", args={"label": "Savings"}, confidence=0.9)],
-                ),
-            )
-        ],
+        # The extraction expression is authored at discovery (read_value) and attached by the
+        # recorder from the trajectory — so we declare only name+type here.
+        outputs=[OutputSpec(name="savings_balance", type="number")],
         known_conditions=[
             KnownCondition(
                 code=OutcomeCode.NOT_FOUND, klass=OutcomeClass.BUSINESS_OUTCOME,

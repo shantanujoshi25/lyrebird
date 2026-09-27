@@ -13,6 +13,53 @@
     "container_path": [],
     "nearby_text": [
       "Review\nMember\t100001\nInitial deposit\t250.00\nAccount type\tMoney Market\nStatement delivery\tElectronic\nConfirm and open acc"
+    ],
+    "locators": [
+      {
+        "kind": "role",
+        "value": "button",
+        "name": "Confirm and open account"
+      },
+      {
+        "kind": "text",
+        "value": "Confirm and open account"
+      },
+      {
+        "kind": "nth",
+        "value": "button@0"
+      }
+    ]
+  },
+  {
+    "index": 1,
+    "role": "text",
+    "name": "250.00",
+    "value": "250.00",
+    "bbox": [
+      137,
+      103,
+      98,
+      20
+    ],
+    "container_path": [],
+    "nearby_text": [
+      "Initial deposit\t250.00",
+      "Initial deposit"
+    ],
+    "locators": [
+      {
+        "kind": "label",
+        "value": "Initial deposit"
+      },
+      {
+        "kind": "role",
+        "value": "text",
+        "name": "250.00"
+      },
+      {
+        "kind": "nth",
+        "value": "td@4"
+      }
     ]
   }
 ]

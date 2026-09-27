@@ -10,7 +10,6 @@ Writes are atomic (write-temp-then-rename) so a reader never sees a half-written
 
 from __future__ import annotations
 
-import json
 import os
 import time
 from enum import Enum
@@ -51,11 +50,11 @@ class RunState(BaseModel):
         os.replace(tmp, p)  # atomic rename — readers never see a partial file
 
     @classmethod
-    def read(cls, run_dir: Path | str) -> "RunState":
+    def read(cls, run_dir: Path | str) -> RunState:
         return cls.model_validate_json(cls.path(run_dir).read_text())
 
     @classmethod
-    def poll_until(cls, run_dir: Path | str, target: Control, *, timeout_s: float, interval_s: float = 0.1) -> "RunState":
+    def poll_until(cls, run_dir: Path | str, target: Control, *, timeout_s: float, interval_s: float = 0.1) -> RunState:
         """Block (by polling the file) until control reaches `target` or timeout.
 
         This is how the engine 'blocks' during PENDING_HUMAN: it does not hold an in-memory

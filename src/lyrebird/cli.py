@@ -12,7 +12,6 @@ replaces its placeholder branch with the real subcommand.
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 
 
@@ -20,14 +19,20 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="lyrebird", description="Computer-use automation.")
     sub = parser.add_subparsers(dest="command")
 
-    d = sub.add_parser("discover", help="Run the LLM discovery loop (C3). Spends tokens.")
-    d.add_argument("--url", default="http://127.0.0.1:8000", help="base URL of the running mock app")
+    d = sub.add_parser("discover", help="Interactive NL discovery: goal + URL. Spends tokens.")
+    d.add_argument("--goal", default=None, help="natural-language goal (prompts if omitted)")
+    d.add_argument("--url", default=None, help="target URL (prompts if omitted)")
+    d.add_argument("--policy", default=None, help="allowlist policy file (default: policy.yaml)")
     d.add_argument("--headless", action="store_true", help="run the browser headless")
+    d.add_argument("--username", default=None, help="login username (non-secret; prompts if a login flow)")
+    d.add_argument("--have-credentials", dest="have_credentials", action="store_true",
+                   help="you will provide credentials (password prompted, never echoed)")
 
     r = sub.add_parser("replay", help="Deterministically replay a capability (C5). No LLM.")
     r.add_argument("capability", help="capability id (e.g. lookup_savings_balance)")
     r.add_argument("--url", default="http://127.0.0.1:8000", help="base URL of the running mock app")
-    r.add_argument("--param", action="append", default=[], metavar="k=v", help="an input param (repeatable)")
+    r.add_argument("--param", action="append", default=[], metavar="k=v", help="a NON-secret input param (repeatable)")
+    r.add_argument("--secrets", default="secrets.yaml", help="YAML file with sensitive param values (default: secrets.yaml)")
     r.add_argument("--approve", action="store_true", help="treat the artifact as approved (for risky steps)")
     r.add_argument("--confirm-risky", action="store_true", help="opt in to running risky steps")
     r.add_argument("--pre-login", action="store_true", help="log in before the capability (for capabilities that start mid-flow)")
@@ -46,20 +51,23 @@ def main(argv: list[str] | None = None) -> int:
         parser.print_help()
         return 0
     if args.command == "discover":
-        from lyrebird.discovery.run import run_readonly_discovery
+        from lyrebird.discovery.interactive import run_interactive
 
-        run_readonly_discovery(args.url, headed=not args.headless)
-        return 0
+        status, _ = run_interactive(
+            goal=args.goal, url=args.url, policy_path=args.policy, headless=args.headless,
+            username=args.username,
+            have_credentials=True if args.have_credentials else None,
+        )
+        return 0 if status == "SUCCESS" else 1
     if args.command == "replay":
         from lyrebird.replay.run import replay_run
 
         params = dict(kv.split("=", 1) for kv in args.param)
         status, _ = replay_run(
-            args.capability, args.url, params=params,
+            args.capability, args.url, params=params, secrets_path=args.secrets,
             status_override="approved" if args.approve else None,
             confirm_risky=args.confirm_risky, pre_login=args.pre_login,
             pre_nav=args.pre_nav, headed=args.headed,
-            sensitive_values=[os.environ["LYREBIRD_PARAM_PASSWORD"]] if os.environ.get("LYREBIRD_PARAM_PASSWORD") else None,
         )
         return 0 if status in ("SUCCESS", "BUSINESS_OUTCOME", "ESCALATED") else 1
     if args.command == "operator":

@@ -2,8 +2,8 @@
   {
     "index": 0,
     "role": "textbox",
-    "name": "teller",
-    "value": "teller",
+    "name": "u",
+    "value": "",
     "bbox": [
       83,
       82,
@@ -23,7 +23,7 @@
       {
         "kind": "role",
         "value": "textbox",
-        "name": "teller"
+        "name": "u"
       },
       {
         "kind": "nth",

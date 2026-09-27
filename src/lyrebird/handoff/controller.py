@@ -14,8 +14,8 @@ expected state. Fires identically in both loops (A3b).
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from lyrebird.handoff.intervention import InterventionRequest
 from lyrebird.handoff.runstate import Control, RunState

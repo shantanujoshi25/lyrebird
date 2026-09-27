@@ -39,6 +39,9 @@ class Element(BaseModel):
     bbox: tuple[int, int, int, int]  # (x, y, w, h) in viewport px — last-resort locator only
     container_path: list[str] = []   # frame/window hierarchy, FLATTENED (e.g. ["frame:workspace"])
     nearby_text: list[str] = []      # for label-proximity / relative-anchor strategies
+    # durable locator candidates read straight off this DOM node, most-stable first. Each is
+    # {kind: css|role|text|nth, value, name?}. Recorded so replay re-finds the SAME node.
+    locators: list[dict] = []
 
 
 class Observation(BaseModel):
@@ -83,5 +86,9 @@ class Surface(Protocol):
     def act(self, action: Action) -> ActionResult: ...
     def snapshot(self, dir: Path) -> None: ...
     def page_text(self) -> str: ...   # visible text across all frames — for text conditions + extraction
+    # ── durable-locator resolution (replay path; no element index) ──────────
+    def resolve_locator(self, locator: object) -> tuple[object | None, int]: ...  # (pw_locator, drift_depth)
+    def read_locator(self, locator: object) -> tuple[str | None, int]: ...   # (text, drift_depth)
+    def act_locator(self, kind: str, locator: object, value: str | None) -> ActionResult: ...
     @property
     def viewport(self) -> Viewport: ...

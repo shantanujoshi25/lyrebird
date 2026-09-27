@@ -1,5 +1,6 @@
 {"step": 0, "tool": "type", "input": {"index": 0, "param": "username"}, "binding": "{{username}}", "url": "http://127.0.0.1:8000/login", "ok": true, "note": "ok"}
 {"step": 1, "tool": "type", "input": {"index": 1, "param": "password"}, "binding": "{{password}}", "url": "http://127.0.0.1:8000/login", "ok": true, "note": "ok"}
-{"step": 2, "tool": "click", "input": {"index": 2}, "binding": null, "url": "http://127.0.0.1:8000/login", "ok": true, "note": "ok"}
+{"step": 2, "tool": "click", "input": {"index": 2, "expect_text": "Member Lookup"}, "binding": null, "url": "http://127.0.0.1:8000/login", "ok": false, "note": "ok EXPECTED 'Member Lookup' but it did not appear \u2014 the action may not have worked"}
 {"step": 3, "tool": "type", "input": {"index": 0, "param": "member_id"}, "binding": "{{member_id}}", "url": "http://127.0.0.1:8000/member", "ok": true, "note": "ok"}
-{"step": 4, "tool": "click", "input": {"index": 1}, "binding": null, "url": "http://127.0.0.1:8000/member", "ok": true, "note": "ok"}
+{"step": 4, "tool": "click", "input": {"index": 1, "expect_text": "100001"}, "binding": null, "url": "http://127.0.0.1:8000/member", "ok": true, "note": "ok verified '100001'", "expected_text": "100001"}
+{"step": 5, "tool": "read_value", "input": {"output": "savings_balance", "value_seen": "$4,210.75", "find_by": "text_contains", "find_args": {"text": "$4,210.75"}, "pattern": "\\$[0-9,]+(\\.[0-9]{2})?"}, "binding": null, "url": "http://127.0.0.1:8000/member/100001", "ok": true, "note": "read savings_balance", "output_read": {"output": "savings_balance", "value_seen": "$4,210.75", "extraction": {"find_by": "text_contains", "find_args": {"text": "$4,210.75"}, "read": "own_text", "value_seen": "$4,210.75", "pattern": "\\$[0-9,]+(\\.[0-9]{2})?"}}}

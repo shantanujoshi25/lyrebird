@@ -33,5 +33,5 @@ class InterventionRequest(BaseModel):
         return p
 
     @classmethod
-    def read(cls, run_dir: Path | str) -> "InterventionRequest":
+    def read(cls, run_dir: Path | str) -> InterventionRequest:
         return cls.model_validate_json(cls.path(run_dir).read_text())
