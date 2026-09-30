@@ -8,7 +8,7 @@ Safety (allowlist + redaction), evidence, and human handoff wrap all three.
 > The through-line: **the model discovers; the artifact becomes a reusable capability;
 > deterministic replay is how an agent invokes it in production.**
 
-[![Lyrebird demo](https://img.youtube.com/vi/cVLLhQC1e2k/maxresdefault.jpg)](https://www.youtube.com/watch?v=cVLLhQC1e2k)
+[![Lyrebird demo](https://img.youtube.com/vi/cVLLhQC1e2k/hqdefault.jpg)](https://www.youtube.com/watch?v=cVLLhQC1e2k)
 
 
 The core idea for robustness: at discovery the LLM picks an element and *judges* whether each
